@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stazione Meteo Simo</title>
+    <!-- Importazione Chart.js per i grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS: Layout e Design */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #00e676; text-transform: uppercase; letter-spacing: 2px; text-align: center;}
+        
+        /* Box Previsioni e Allarmi */
+        .forecast-box {
+            background-color: #2c2c2c; border: 2px solid #555; border-radius: 12px;
+            padding: 20px; width: 100%; max-width: 960px; text-align: center;
+            margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .forecast-title { font-size: 0.9em; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
+        .forecast-text { font-size: 1.8em; font-weight: bold; color: #fff; margin-top: 10px;}
+        
+        /* Banner Allarmi Dinamico */
+        .alert-banner {
+            display: none; /* Nascosto di default */
+            width: 100%; max-width: 960px; margin-top: 15px; padding: 15px;
+            border-radius: 8px; font-weight: bold; text-align: center;
+            animation: pulse 2s infinite;
+        }
+        .alert-ice { background-color: #0d47a1; color: #bbdefb; border: 2px solid #42a5f5; display: block; }
+        .alert-fog { background-color: #424242; color: #eeeeee; border: 2px solid #9e9e9e; display: block; }
+        .alert-storm { background-color: #b71c1c; color: #ffcdd2; border: 2px solid #ef5350; display: block; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* Griglia Card Sensori */
+        .dashboard {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px; width: 100%; max-width: 1000px; margin-top: 20px;
+        }
+        .card {
+            background-color: #1e1e1e; border-radius: 12px; padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center;
+            border-top: 4px solid #333; position: relative;
+        }
+        .card.temp { border-top-color: #ff5252; }
+        .card.umid { border-top-color: #448aff; }
+        .card.press { border-top-color: #b2ff59; }
+        .card.gas { border-top-color: #ffc400; }
+        
+        .value { font-size: 2.8em; font-weight: bold; margin: 10px 0; }
+        .unit { font-size: 0.4em; color: #aaaaaa; }
+        .label { font-size: 1.2em; color: #bbbbbb; }
+        .sub-label { font-size: 0.8em; color: #888; margin-top: -10px; margin-bottom: 10px; display: block;}
+        
+        /* Grafico */
+        .chart-container {
+            width: 100%; max-width: 1000px; height: 350px;
+            background-color: #1e1e1e; border-radius: 12px; padding: 20px;
+            margin-top: 25px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Trend e Min/Max */
+        .trend { font-size: 0.4em; margin-left: 10px; vertical-align: middle; }
+        .trend-small { font-size: 0.8em; margin-left: 5px; }
+        .up { color: #ff5252; } 
+        .down { color: #448aff; } 
+        .stable { color: #888; } 
+        .min-max-box { margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; font-size: 0.9em; color: #ccc; display: flex; justify-content: space-around; }
+        .min-max-item span { font-weight: bold; color: #fff; }
+
+        .timestamp { margin-top: 30px; color: #888888; font-size: 0.9em; text-align: center;}
+        .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-dot.connected { background-color: #00e676; }
+    </style>
+</head>
+<body>
+
+    <h1><span class="status-dot" id="connection-status"></span>Stazione Meteo Simo</h1>
+
+    <!-- Box Algoritmo Previsionale WMO -->
+    <div class="forecast-box">
+        <div class="forecast-title">Previsione a Breve Termine (Standard WMO 3 Ore)</div>
+        <div class="forecast-text" id="forecast-output">Analisi dati in corso... (Richiede 3h di storico)</div>
+    </div>
+
+    <!-- Banner Allarmi Dinamico -->
+    <div id="alert-box" class="alert-banner"></div>
+
+    <!-- Dashboard Valori Sensori -->
+    <div class="dashboard">
+        <div class="card temp">
+            <div class="label">Temperatura Attuale</div>
+            <div class="value"><span id="val-temp">--</span><span class="unit">°C</span><span class="trend" id="trend-temp"></span></div>
+            <span class="sub-label">Dew Point: <span id="val-dew">--</span>°C</span>
+            
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-min">--</span>°C <span class="trend-small" id="trend-min"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-max">--</span>°C <span class="trend-small" id="trend-max"></span></div>
+            </div>
+        </div>
+
+        <div class="card umid">
+            <div class="label">Umidità Attuale</div>
+            <div class="value"><span id="val-umid">--</span><span class="unit">%</span><span class="trend" id="trend-umid"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-umin">--</span>% <span class="trend-small" id="trend-umin"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-umax">--</span>% <span class="trend-small" id="trend-umax"></span></div>
+            </div>
+        </div>
+
+        <div class="card press">
+            <div class="label">Pressione</div>
+            <div class="value"><span id="val-press">--</span><span class="unit">hPa</span><span class="trend" id="trend-press"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-pmin">--</span> <span class="trend-small" id="trend-pmin"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-pmax">--</span> <span class="trend-small" id="trend-pmax"></span></div>
+            </div>
+        </div>
+
+        <div class="card gas">
+            <div class="label">Qualità Aria (Raw)</div>
+            <div class="value"><span id="val-gas">--</span><span class="unit">/1024</span><span class="trend" id="trend-gas"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h (Migliore)<br><span id="val-gmin">--</span> <span class="trend-small" id="trend-gmin"></span></div>
+                <div class="min-max-item">Max 24h (Peggiore)<br><span id="val-gmax">--</span> <span class="trend-small" id="trend-gmax"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenitore Grafico Storico Termo-Barometrico -->
+    <div class="chart-container">
+        <canvas id="weatherChart"></canvas>
+    </div>
+
+    <!-- Contenitore Grafico Storico Igrometrico e Qualità Aria -->
+    <div class="chart-container">
+        <canvas id="hygroGasChart"></canvas>
+    </div>
+
+    <div class="timestamp" id="last-update">Ultimo aggiornamento: In attesa di connessione...</div>
+
+    <!-- JAVASCRIPT: Logica, Termodinamica e Grafici -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, query, orderByChild, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAobl_IquxYnuUL2Y0rgFf3tRIyyrhpG48",
+            authDomain: "stazione-meteo-esp8266.firebaseapp.com",
+            databaseURL: "https://stazione-meteo-esp8266-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "stazione-meteo-esp8266",
+            storageBucket: "stazione-meteo-esp8266.firebasestorage.app",
+            messagingSenderId: "372345019157",
+            appId: "1:372345019157:web:21d12f82abf3e14a26e71c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const storicoRef = query(ref(db, 'MeteoStorico'), orderByChild('timestamp'), limitToLast(576));
+        const statusDot = document.getElementById('connection-status');
+        const alertBox = document.getElementById('alert-box');
+
+        // --- INIZIALIZZAZIONE GRAFICI (Chart.js) ---
+        // 1. Grafico Temperatura e Pressione
+        const ctx = document.getElementById('weatherChart').getContext('2d');
+        const weatherChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // Orari
+                datasets: [
+                    {
+                        label: 'Temperatura (°C)',
+                        yAxisID: 'yTemp',
+                        borderColor: '#ff5252',
+                        backgroundColor: 'rgba(255, 82, 82, 0.1)',
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Pressione (hPa)',
+                        yAxisID: 'yPress',
+                        borderColor: '#b2ff59',
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { color: '#fff' } } },
+                scales: {
+                    x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } },
+                    yTemp: { type: 'linear', position: 'left', ticks: { color: '#ff5252' }, grid: { color: '#333' } },
+                    yPress: { type: 'linear', position: 'right', ticks: { color: '#b2ff59' }, grid: { display: false } }
+                }
+            }
+        });
+
+        // 2. Grafico Umidità e Qualità Aria
+        const ctx2 = document.getElementById('hygroGasChart').getContext('2d');
+        const hygroGasChart = new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: [], // Orari condivisi
+                datasets: [
+                    {
+                        label: 'Umidità (%)',
+                        yAxisID: 'yUmid',
+                        borderColor: '#448aff',
+                        backgroundColor: 'rgba(68, 138, 255, 0.1)',
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Gas (Raw)',
+                        yAxisID: 'yGas',
+                        borderColor: '#ffc400',
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { color: '#fff' } } },
+                scales: {
+                    x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } },
+                    yUmid: { type: 'linear', position: 'left', ticks: { color: '#448aff' }, grid: { color: '#333' } },
+                    yGas: { type: 'linear', position: 'right', ticks: { color: '#ffc400' }, grid: { display: false } }
+                }
+            }
+        });
+
+        function getTrendHTML(delta, threshold, invertColors = false) {
+            if (delta > threshold) return invertColors ? '<span class="up" style="color:#00e676;">▲</span>' : '<span class="up">▲</span>';
+            if (delta < -threshold) return invertColors ? '<span class="down" style="color:#ff5252;">▼</span>' : '<span class="down">▼</span>';
+            return '<span class="stable">▶</span>'; 
+        }
+
+        // --- TERMODINAMICA: Formula di Magnus-Tetens per il Punto di Rugiada ---
+        function calculateDewPoint(temp, humidity) {
+            const a = 17.27;
+            const b = 237.7;
+            const alpha = ((a * temp) / (b + temp)) + Math.log(humidity / 100.0);
+            return (b * alpha) / (a - alpha);
+        }
+
+        // --- SISTEMA DI ALLERTA ---
+        function checkAlerts(temp, humidity, dewPoint, deltaPressione3h) {
+            alertBox.className = "alert-banner"; // Reset classi
+            alertBox.innerHTML = "";
+
+            // 1. Allarme Temporale (Crollo barometrico > 3 hPa in 3h)
+            if (deltaPressione3h <= -3.0) {
+                alertBox.classList.add("alert-storm");
+                alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico. Rischio temporali forti o burrasca.";
+                return; // Priorità massima
+            }
+
+            // 2. Pericolo Ghiaccio (T vicina a zero e umidità che gela)
+            if (temp <= 3.0 && dewPoint <= 0.0) {
+                alertBox.classList.add("alert-ice");
+                alertBox.innerHTML = "❄️ ATTENZIONE GHIACCIO: Possibile formazione di brina o ghiaccio al suolo.";
+                return;
+            }
+
+            // 3. Rischio Nebbia (T vicina al punto di rugiada, aria satura)
+            if ((temp - dewPoint) <= 1.5 && humidity >= 90.0) {
+                alertBox.classList.add("alert-fog");
+                alertBox.innerHTML = "🌫️ RISCHIO NEBBIA: Visibilità potenzialmente ridotta.";
+                return;
+            }
+        }
+
+        function calculateForecast(pressioneAttuale, deltaPressione3h) {
+            if (Math.abs(deltaPressione3h) < 1.0) {
+                if (pressioneAttuale >= 1022) return "Soleggiato e Stabile ☀️";
+                if (pressioneAttuale >= 1010) return "Bel Tempo Variabile 🌤️";
+                return "Nuvoloso / Possibili precipitazioni ☁️";
+            }
+            if (deltaPressione3h >= 1.0) {
+                if (deltaPressione3h >= 3.0) return "Miglioramento Rapido / Vento Forte 💨";
+                if (pressioneAttuale < 1010) return "Schiarite in arrivo ⛅";
+                return "Miglioramento Costante ☀️";
+            }
+            if (deltaPressione3h <= -1.0) {
+                if (deltaPressione3h <= -3.0) return "Peggioramento Severo Imminente ⛈️";
+                if (pressioneAttuale >= 1020) return "Inizio Peggioramento 🌥️";
+                return "Pioggia in arrivo 🌧️";
+            }
+            return "Analisi in corso...";
+        }
+
+        onValue(storicoRef, (snapshot) => {
+            const records = [];
+            snapshot.forEach((child) => { records.push(child.val()); });
+
+            if (records.length > 0) {
+                const dataAttuale = records[records.length - 1];
+                
+                // Calcolo Punto di Rugiada
+                const dewPoint = calculateDewPoint(dataAttuale.temperatura, dataAttuale.umidita);
+                document.getElementById('val-dew').innerText = dewPoint.toFixed(1);
+
+                document.getElementById('val-temp').innerText = dataAttuale.temperatura.toFixed(1);
+                document.getElementById('val-umid').innerText = dataAttuale.umidita.toFixed(1);
+                document.getElementById('val-press').innerText = dataAttuale.pressione.toFixed(1);
+                document.getElementById('val-gas').innerText = dataAttuale.gas_raw;
+
+                const date = new Date(dataAttuale.timestamp * 1000); 
+                document.getElementById('last-update').innerText = `Ultimo aggiornamento: ${date.toLocaleString('it-IT')}`;
+                statusDot.classList.add('connected');
+
+                let deltaP = 0; // Usato anche per gli alert
+
+                // --- CALCOLO TREND SULLE 3 ORE E ALLARMI ---
+                if (records.length > 1) {
+                    const offset3h = Math.min(records.length, 36); 
+                    const dataVecchia = records[records.length - offset3h]; 
+                    
+                    const deltaT = dataAttuale.temperatura - dataVecchia.temperatura;
+                    const deltaH = dataAttuale.umidita - dataVecchia.umidita;
+                    deltaP = dataAttuale.pressione - dataVecchia.pressione;
+                    const deltaG = dataAttuale.gas_raw - dataVecchia.gas_raw;
+
+                    document.getElementById('trend-temp').innerHTML = getTrendHTML(deltaT, 0.2);
+                    document.getElementById('trend-umid').innerHTML = getTrendHTML(deltaH, 1.0);
+                    document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5, true); 
+                    document.getElementById('trend-gas').innerHTML = getTrendHTML(deltaG, 20);
+
+                    const previsione = calculateForecast(dataAttuale.pressione, deltaP);
+                    const minutiStorico = (offset3h - 1) * 5; 
+                    document.getElementById('forecast-output').innerHTML = 
+                        `${previsione} <br><span style="font-size:0.4em; color:#777;">(Basato su un trend di ${minutiStorico} min - Delta P: ${deltaP.toFixed(2)} hPa)</span>`;
+                    
+                    // Valutazione Termodinamica per Generazione Allarmi
+                    checkAlerts(dataAttuale.temperatura, dataAttuale.umidita, dewPoint, deltaP);
+                }
+                
+                // --- AGGIORNAMENTO GRAFICO E MIN/MAX (Ultime 24h) ---
+                const last24h = records.slice(-288); 
+                const prev24h = records.slice(-576, -288); 
+
+                if (last24h.length > 0) {
+                    // Costruzione array per i grafici
+                    const labels = [];
+                    const tempData = [];
+                    const pressData = [];
+                    const umidData = [];
+                    const gasData = [];
+
+                    last24h.forEach(rec => {
+                        const d = new Date(rec.timestamp * 1000);
+                        labels.push(d.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'}));
+                        tempData.push(rec.temperatura);
+                        pressData.push(rec.pressione);
+                        umidData.push(rec.umidita);
+                        gasData.push(rec.gas_raw);
+                    });
+
+                    // Update Chart 1 (Temp/Press)
+                    weatherChart.data.labels = labels;
+                    weatherChart.data.datasets[0].data = tempData;
+                    weatherChart.data.datasets[1].data = pressData;
+                    weatherChart.update();
+
+                    // Update Chart 2 (Umid/Gas)
+                    hygroGasChart.data.labels = labels;
+                    hygroGasChart.data.datasets[0].data = umidData;
+                    hygroGasChart.data.datasets[1].data = gasData;
+                    hygroGasChart.update();
+
+                    // Calcolo Min/Max testuali
+                    const max24 = Math.max(...last24h.map(r => r.temperatura));
+                    const min24 = Math.min(...last24h.map(r => r.temperatura));
+                    const maxU24 = Math.max(...last24h.map(r => r.umidita));
+                    const minU24 = Math.min(...last24h.map(r => r.umidita));
+                    const maxP24 = Math.max(...last24h.map(r => r.pressione));
+                    const minP24 = Math.min(...last24h.map(r => r.pressione));
+                    const maxG24 = Math.max(...last24h.map(r => r.gas_raw));
+                    const minG24 = Math.min(...last24h.map(r => r.gas_raw));
+                    
+                    document.getElementById('val-max').innerText = max24.toFixed(1);
+                    document.getElementById('val-min').innerText = min24.toFixed(1);
+                    document.getElementById('val-umax').innerText = maxU24.toFixed(1);
+                    document.getElementById('val-umin').innerText = minU24.toFixed(1);
+                    document.getElementById('val-pmax').innerText = maxP24.toFixed(1);
+                    document.getElementById('val-pmin').innerText = minP24.toFixed(1);
+                    document.getElementById('val-gmax').innerText = maxG24;
+                    document.getElementById('val-gmin').innerText = minG24;
+
+                    if (prev24h.length > 0) {
+                        const maxPrev = Math.max(...prev24h.map(r => r.temperatura));
+                        const minPrev = Math.min(...prev24h.map(r => r.temperatura));
+                        const maxUPrev = Math.max(...prev24h.map(r => r.umidita));
+                        const minUPrev = Math.min(...prev24h.map(r => r.umidita));
+                        const maxPPrev = Math.max(...prev24h.map(r => r.pressione));
+                        const minPPrev = Math.min(...prev24h.map(r => r.pressione));
+                        const maxGPrev = Math.max(...prev24h.map(r => r.gas_raw));
+                        const minGPrev = Math.min(...prev24h.map(r => r.gas_raw));
+                        
+                        document.getElementById('trend-max').innerHTML = getTrendHTML(max24 - maxPrev, 0.2);
+                        document.getElementById('trend-min').innerHTML = getTrendHTML(min24 - minPrev, 0.2);
+                        document.getElementById('trend-umax').innerHTML = getTrendHTML(maxU24 - maxUPrev, 1.0);
+                        document.getElementById('trend-umin').innerHTML = getTrendHTML(minU24 - minUPrev, 1.0);
+                        document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5, true);
+                        document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5, true);
+                        document.getElementById('trend-gmax').innerHTML = getTrendHTML(maxG24 - maxGPrev, 20);
+                        document.getElementById('trend-gmin').innerHTML = getTrendHTML(minG24 - minGPrev, 20);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
