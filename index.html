@@ -91,9 +91,9 @@
 
     <h1><span class="status-dot" id="connection-status"></span>Stazione Meteo Simo</h1>
 
-    <!-- Box Algoritmo Previsionale WMO -->
+    <!-- Box Algoritmo Previsionale WMO (Aggiornato) -->
     <div class="forecast-box">
-        <div class="forecast-title">Previsione a Breve Termine (Standard WMO 3 Ore)</div>
+        <div class="forecast-title">Tendenza Meteorologica (Standard WMO 3 Ore)</div>
         <div class="forecast-text" id="forecast-output">Analisi dati in corso... (Richiede 3h di storico)</div>
     </div>
 
@@ -281,7 +281,7 @@
             // 1. Allarme Temporale (Crollo barometrico > 3 hPa in 3h)
             if (deltaPressione3h <= -3.0) {
                 alertBox.classList.add("alert-storm");
-                alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico. Rischio temporali forti o burrasca.";
+                alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico improvviso. Rischio fenomeni violenti.";
                 return; // Priorità massima
             }
 
@@ -300,21 +300,22 @@
             }
         }
 
-        function calculateForecast(pressioneAttuale, deltaPressione3h) {
+        // --- TENDENZA METEO SCIENTIFICA ---
+        // Ricalibrata per definire esclusivamente il vettore evolutivo (Stabile, Miglioramento, Peggioramento)
+        function calculateForecast(deltaPressione3h) {
+            // Variazione barometrica insignificante (< 1.0 hPa in 3 ore)
             if (Math.abs(deltaPressione3h) < 1.0) {
-                if (pressioneAttuale >= 1022) return "Soleggiato e Stabile ☀️";
-                if (pressioneAttuale >= 1010) return "Bel Tempo Variabile 🌤️";
-                return "Nuvoloso / Possibili precipitazioni ☁️";
+                return "Condizioni Costanti / Stabili ➖";
             }
+            // Aumento di pressione (Aria più densa e secca verso il basso)
             if (deltaPressione3h >= 1.0) {
-                if (deltaPressione3h >= 3.0) return "Miglioramento Rapido / Vento Forte 💨";
-                if (pressioneAttuale < 1010) return "Schiarite in arrivo ⛅";
-                return "Miglioramento Costante ☀️";
+                if (deltaPressione3h >= 3.0) return "Forte Miglioramento / Possibile Vento 💨";
+                return "In Miglioramento 📈";
             }
+            // Calo di pressione (Aria umida in ascesa, formazione nuvolosa)
             if (deltaPressione3h <= -1.0) {
-                if (deltaPressione3h <= -3.0) return "Peggioramento Severo Imminente ⛈️";
-                if (pressioneAttuale >= 1020) return "Inizio Peggioramento 🌥️";
-                return "Pioggia in arrivo 🌧️";
+                if (deltaPressione3h <= -3.0) return "Forte Peggioramento / Instabilità ⛈️";
+                return "In Peggioramento 📉";
             }
             return "Analisi in corso...";
         }
@@ -339,7 +340,7 @@
                 document.getElementById('last-update').innerText = `Ultimo aggiornamento: ${date.toLocaleString('it-IT')}`;
                 statusDot.classList.add('connected');
 
-                let deltaP = 0; // Usato anche per gli alert
+                let deltaP = 0;
 
                 // --- CALCOLO TREND SULLE 3 ORE E ALLARMI ---
                 if (records.length > 1) {
@@ -356,10 +357,11 @@
                     document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5, true); 
                     document.getElementById('trend-gas').innerHTML = getTrendHTML(deltaG, 20);
 
-                    const previsione = calculateForecast(dataAttuale.pressione, deltaP);
+                    // La funzione ora richiede solo il delta di pressione
+                    const previsione = calculateForecast(deltaP);
                     const minutiStorico = (offset3h - 1) * 5; 
                     document.getElementById('forecast-output').innerHTML = 
-                        `${previsione} <br><span style="font-size:0.4em; color:#777;">(Basato su un trend di ${minutiStorico} min - Delta P: ${deltaP.toFixed(2)} hPa)</span>`;
+                        `${previsione} <br><span style="font-size:0.4em; color:#777;">(Tendenza su ${minutiStorico} min - Delta P: ${deltaP.toFixed(2)} hPa)</span>`;
                     
                     // Valutazione Termodinamica per Generazione Allarmi
                     checkAlerts(dataAttuale.temperatura, dataAttuale.umidita, dewPoint, deltaP);
@@ -370,7 +372,6 @@
                 const prev24h = records.slice(-576, -288); 
 
                 if (last24h.length > 0) {
-                    // Costruzione array per i grafici
                     const labels = [];
                     const tempData = [];
                     const pressData = [];
@@ -386,19 +387,16 @@
                         gasData.push(rec.gas_raw);
                     });
 
-                    // Update Chart 1 (Temp/Press)
                     weatherChart.data.labels = labels;
                     weatherChart.data.datasets[0].data = tempData;
                     weatherChart.data.datasets[1].data = pressData;
                     weatherChart.update();
 
-                    // Update Chart 2 (Umid/Gas)
                     hygroGasChart.data.labels = labels;
                     hygroGasChart.data.datasets[0].data = umidData;
                     hygroGasChart.data.datasets[1].data = gasData;
                     hygroGasChart.update();
 
-                    // Calcolo Min/Max testuali
                     const max24 = Math.max(...last24h.map(r => r.temperatura));
                     const min24 = Math.min(...last24h.map(r => r.temperatura));
                     const maxU24 = Math.max(...last24h.map(r => r.umidita));
