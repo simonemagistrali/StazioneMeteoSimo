@@ -190,7 +190,7 @@
     <div class="ai-modal-overlay" id="pca-modal">
         <div class="pca-modal-content">
             <div class="ai-modal-title" style="color: #fff;">Confronto Analisi PCA 🔬</div>
-            <div class="ai-modal-desc" style="margin-bottom: 5px;">Proiezione bidimensionale per studiare le influenze e la separazione dei dati meteo.</div>
+            <div class="ai-modal-desc" style="margin-bottom: 5px;">Proiezione bidimensionale per studiare le influenze e la separazione dei dati meteo. Il pallino verde grande indica la situazione meteo <b>attuale</b>.</div>
             
             <!-- PCA 1: Solo Fisica -->
             <div class="pca-section-title">Test 1: Solo Grandezze Fisiche (T, U, P, Gas)</div>
@@ -545,9 +545,9 @@
             return Math.floor(diff / oneDay);
         }
 
-        // MOTORE DI CALCOLO E RENDERING PCA MODULARE
-        function eseguiEPlottaPCA(features, rawData, labels, canvasId, textContentId, existingChartInstance) {
-            // 1. Standardizzazione
+        // MOTORE DI CALCOLO E RENDERING PCA MODULARE (Con Proiezione Dato Attuale)
+        function eseguiEPlottaPCA(features, rawData, labels, canvasId, textContentId, existingChartInstance, currentRawData) {
+            // 1. Standardizzazione dello Storico
             let means = [], stdDevs = [];
             for (let j = 0; j < features.length; j++) {
                 let col = rawData.map(row => row[j]);
@@ -556,7 +556,7 @@
             }
             let zData = rawData.map(row => row.map((val, j) => (val - means[j]) / stdDevs[j]));
 
-            // 2. Covarianza e Autovettori
+            // 2. Covarianza e Autovettori sullo Storico
             let covMatrix = getCovarianceMatrix(zData);
             let eigenData = jacobiEigenSolver(covMatrix);
             
@@ -564,7 +564,7 @@
             let totalVariance = eigenData.eigenvalues.reduce((a, b) => a + b, 0);
             let varExplained = eigenData.eigenvalues.map(val => (val / totalVariance) * 100);
 
-            // 4. Proiezione Dati su PC1 e PC2
+            // 4. Proiezione Dati Storici su PC1 e PC2
             let projectedData = [];
             for (let i = 0; i < zData.length; i++) {
                 let pc1 = 0, pc2 = 0;
@@ -575,21 +575,53 @@
                 projectedData.push({ x: pc1, y: pc2, label: labels[i] });
             }
 
-            // 5. Generazione Testo Scientifico
+            // 5. Proiezione del DATO ATTUALE (Se presente)
+            let currentPc1 = 0, currentPc2 = 0;
+            let currentZScores = []; // Salviamo gli Z-score attuali per mostrarli a video
+            if (currentRawData) {
+                // SCIENTIFICAMENTE CORRETTO: Standardizziamo il dato attuale 
+                // usando la media e varianza dello storico, poi proiettiamo.
+                for (let j = 0; j < features.length; j++) {
+                    let zValCurr = (currentRawData[j] - means[j]) / stdDevs[j];
+                    currentZScores.push(zValCurr);
+                    currentPc1 += zValCurr * eigenData.eigenvectors[0][j];
+                    currentPc2 += zValCurr * eigenData.eigenvectors[1][j];
+                }
+            }
+
+            // 6. Generazione Testo Scientifico
             let mathHTML = "";
             for(let i=0; i<2; i++) {
                 let eq = [];
+                let eqAttuale = [];
                 for(let j=0; j<features.length; j++) {
                     let weight = eigenData.eigenvectors[i][j];
                     let featureName = features[j].toUpperCase();
                     eq.push(`<span style="display:inline-block; width:120px; text-align:right;">${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${featureName}</span>`);
+                    
+                    if (currentRawData) {
+                        let zScore = currentZScores[j];
+                        // Tooltip aggiunto per mostrare a quale grandezza si riferisce il numero se ci passi sopra col mouse
+                        eqAttuale.push(`<span style="display:inline-block; width:120px; text-align:right;" title="${featureName}">(${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${zScore >= 0 ? '+' : ''}${zScore.toFixed(2)})</span>`);
+                    }
                 }
                 mathHTML += `<b>PC${i+1}</b> (Spiega il <b>${varExplained[i].toFixed(1)}%</b> della varianza totale):<br>`;
-                mathHTML += `${eq.join(" ")}<br><br>`;
+                mathHTML += `${eq.join(" ")}<br>`;
+                
+                if (currentRawData) {
+                    let valAttuale = i === 0 ? currentPc1 : currentPc2;
+                    mathHTML += `<span style="color: #00e676;"><b>PC${i+1} Attuale:</b>&nbsp; ${eqAttuale.join(" + ")} = <b>${valAttuale >= 0 ? '+' : ''}${valAttuale.toFixed(2)}</b></span><br>`;
+                }
+                mathHTML += `<br>`;
             }
+            
+            if (currentRawData) {
+                mathHTML += `<div style="font-size: 0.85em; color: #888; margin-top: -10px; white-space: normal;">* Nota scientifica: i valori attuali inseriti nelle parentesi sono gli <b>Z-scores</b> (dati standardizzati), non i valori grezzi dei sensori. Questo garantisce la validità topologica della proiezione.</div>`;
+            }
+
             document.getElementById(textContentId).innerHTML = mathHTML;
 
-            // 6. Plottaggio Scatter
+            // 7. Plottaggio Scatter
             const ctx = document.getElementById(canvasId).getContext('2d');
             
             const datasets = [
@@ -615,6 +647,19 @@
                 pointRadius: 6,
                 pointHoverRadius: 8
             }));
+
+            // Aggiungiamo il pallino attuale come dataset indipendente, più grande e visibile
+            if (currentRawData) {
+                activeDatasets.push({
+                    label: '🟢 SITUAZIONE ATTUALE',
+                    data: [{x: currentPc1, y: currentPc2}],
+                    backgroundColor: '#00e676',
+                    borderColor: '#ffffff',
+                    borderWidth: 2,
+                    pointRadius: 10,
+                    pointHoverRadius: 12
+                });
+            }
 
             if (existingChartInstance) existingChartInstance.destroy();
 
@@ -644,8 +689,7 @@
             }
 
             // CORREZIONE BUG RENDERING: 
-            // Mostriamo il modale PRIMA di calcolare e renderizzare i grafici, 
-            // in modo che Chart.js possa leggere l'altezza reale (500px) del contenitore e non 0.
+            // Mostriamo il modale PRIMA di calcolare e renderizzare i grafici.
             modalPCA.style.display = 'flex';
 
             let labels = archivioDatasetIA.map(row => row.etichetta);
@@ -653,8 +697,9 @@
             // --- TEST 1: PCA SOLO FISICA (4 Dimensioni) ---
             const features1 = ["Temp", "Umid", "Press", "Gas"];
             let rawData1 = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
+            let currentRawData1 = ultimaLetturaSensori ? [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw] : null;
             
-            pcaChartInstance1 = eseguiEPlottaPCA(features1, rawData1, labels, 'pcaChart1', 'pca-math-content1', pcaChartInstance1);
+            pcaChartInstance1 = eseguiEPlottaPCA(features1, rawData1, labels, 'pcaChart1', 'pca-math-content1', pcaChartInstance1, currentRawData1);
 
             // --- TEST 2: PCA FISICA + TEMPO CICLICO (8 Dimensioni) ---
             const features2 = ["Temp", "Umid", "Press", "Gas", "Min_Sin", "Min_Cos", "Day_Sin", "Day_Cos"];
@@ -672,7 +717,21 @@
                 return [row.temperatura, row.umidita, row.pressione, row.gas_raw, min_sin, min_cos, day_sin, day_cos];
             });
 
-            pcaChartInstance2 = eseguiEPlottaPCA(features2, rawData2, labels, 'pcaChart2', 'pca-math-content2', pcaChartInstance2);
+            let currentRawData2 = null;
+            if (ultimaLetturaSensori) {
+                let d_curr = new Date(ultimaLetturaSensori.timestamp * 1000);
+                let min_curr = (d_curr.getHours() * 60) + d_curr.getMinutes();
+                let day_curr = getDayOfYear(d_curr);
+                
+                let min_sin_curr = Math.sin(2 * Math.PI * min_curr / 1440);
+                let min_cos_curr = Math.cos(2 * Math.PI * min_curr / 1440);
+                let day_sin_curr = Math.sin(2 * Math.PI * day_curr / 365.25);
+                let day_cos_curr = Math.cos(2 * Math.PI * day_curr / 365.25);
+
+                currentRawData2 = [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw, min_sin_curr, min_cos_curr, day_sin_curr, day_cos_curr];
+            }
+
+            pcaChartInstance2 = eseguiEPlottaPCA(features2, rawData2, labels, 'pcaChart2', 'pca-math-content2', pcaChartInstance2, currentRawData2);
         }
 
 
