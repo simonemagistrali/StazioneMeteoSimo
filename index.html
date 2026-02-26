@@ -66,15 +66,29 @@
         /* --- STILE PER IL POPUP PCA --- */
         .pca-modal-content {
             background-color: #1e1e1e; border: 2px solid #448aff; border-radius: 12px;
-            padding: 20px; text-align: left; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto;
+            padding: 20px; text-align: left; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto;
             box-shadow: 0 10px 30px rgba(68, 138, 255, 0.2);
             display: flex; flex-direction: column;
         }
-        .pca-chart-container { width: 100%; height: 350px; background-color: #2c2c2c; border-radius: 8px; padding: 10px; box-sizing: border-box; margin-bottom: 20px;}
-        .pca-text-box { background-color: #2c2c2c; padding: 15px; border-radius: 8px; font-size: 0.9em; line-height: 1.5; color: #ddd;}
-        .pca-text-box h3 { color: #448aff; margin-top: 0; margin-bottom: 10px; font-size: 1.2em;}
-        .pca-math { font-family: monospace; background: #121212; padding: 10px; border-radius: 5px; color: #00e676; overflow-x: auto;}
-        .pca-close-wrapper { text-align: center; margin-top: 20px; }
+        .pca-section-title { font-size: 1.3em; font-weight: bold; margin-top: 15px; margin-bottom: 10px; color: #448aff; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        
+        /* CORREZIONE: Errore di battitura sull'altezza corretto, aggiunta altezza minima garantita */
+        .pca-chart-container { 
+            position: relative; 
+            width: 100%; 
+            height: 450px; 
+            min-height: 450px; 
+            background-color: #2c2c2c; 
+            border-radius: 8px; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            margin-bottom: 15px;
+        }
+        
+        .pca-text-box { background-color: #2c2c2c; padding: 15px; border-radius: 8px; font-size: 0.85em; line-height: 1.5; color: #ddd; margin-bottom: 20px;}
+        .pca-text-box h3 { color: #aaa; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;}
+        .pca-math { font-family: monospace; background: #121212; padding: 10px; border-radius: 5px; color: #00e676; overflow-x: auto; white-space: nowrap;}
+        .pca-close-wrapper { text-align: center; margin-top: 20px; position: sticky; bottom: 0; background-color: #1e1e1e; padding: 10px 0;}
 
         /* Notifiche Toast */
         .toast {
@@ -127,7 +141,7 @@
         .label { font-size: 1.2em; color: #bbbbbb; }
         .sub-label { font-size: 0.8em; color: #888; margin-top: -10px; margin-bottom: 10px; display: block;}
         
-        /* Modifica Architettura Grafici: Wrapper e Layout */
+        /* Modifica Architettura Grafici */
         .charts-wrapper {
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -148,7 +162,7 @@
         span.down { color: #ff5252 !important; }   
         span.stable { color: #888888 !important; } 
 
-        .timestamp { margin-top: 30px; color: #888888; font-size: 0.9em; text-align: center;}
+        .timestamp { margin-top: 30px; margin-bottom: 30px; color: #888888; font-size: 0.9em; text-align: center;}
         .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
         .status-dot.connected { background-color: #00e676; }
     </style>
@@ -172,26 +186,38 @@
         </div>
     </div>
 
-    <!-- NUOVO OVERLAY POPUP PER PCA -->
+    <!-- NUOVO OVERLAY POPUP PER ENTRAMBE LE PCA -->
     <div class="ai-modal-overlay" id="pca-modal">
         <div class="pca-modal-content">
-            <div class="ai-modal-title" style="color: #448aff;">Analisi delle Componenti Principali (PCA) 🔬</div>
-            <div class="ai-modal-desc">Proiezione delle 4 grandezze fisiche (T, U, P, Gas) su un piano bidimensionale. I cluster separati indicano che i sensori distinguono bene le condizioni meteo.</div>
+            <div class="ai-modal-title" style="color: #fff;">Confronto Analisi PCA 🔬</div>
+            <div class="ai-modal-desc" style="margin-bottom: 5px;">Proiezione bidimensionale per studiare le influenze e la separazione dei dati meteo.</div>
             
+            <!-- PCA 1: Solo Fisica -->
+            <div class="pca-section-title">Test 1: Solo Grandezze Fisiche (T, U, P, Gas)</div>
             <div class="pca-chart-container">
-                <canvas id="pcaChart"></canvas>
+                <canvas id="pcaChart1"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details1">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content1" class="pca-math">Calcolo matematico in corso...</div>
             </div>
 
-            <div class="pca-text-box" id="pca-details">
-                <h3>Autovettori e Autovalori (Feature Importance)</h3>
-                <div id="pca-math-content" class="pca-math">Calcolo matematico in corso...</div>
-                <p style="margin-top:15px; font-size: 0.85em; color: #aaa;">
-                    * I coefficienti (pesi) dell'autovettore indicano quanto una specifica grandezza fisica contribuisce a quella componente. Valori assoluti alti significano forte influenza.
-                </p>
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 2: Fisica + Tempo Ciclico -->
+            <div class="pca-section-title" style="color: #00e676;">Test 2: Grandezze Fisiche + Tempo (Trigonometrico)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">L'ora e il giorno sono stati aggiunti come coordinate circolari (Sen/Cos) per rispettarne la ciclicità reale.</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart2"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details2">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content2" class="pca-math">Calcolo matematico in corso...</div>
             </div>
 
             <div class="pca-close-wrapper">
-                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('pca-modal')">Chiudi Analisi</button>
+                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('pca-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Analisi</button>
             </div>
         </div>
     </div>
@@ -218,7 +244,7 @@
                 La previsione è errata? Correggila
             </button>
             <button class="btn-pca" onclick="apriModalPCA()">
-                📊 Visualizza analisi PCA (Clustering e Pesi)
+                📊 Visualizza e Confronta Analisi PCA
             </button>
         </div>
     </div>
@@ -302,7 +328,8 @@
         // --- MEMORIA GLOBALE ---
         let ultimaLetturaSensori = null;
         let archivioDatasetIA = []; 
-        let pcaChartInstance = null; // Riferimento al grafico PCA
+        let pcaChartInstance1 = null; // Riferimento al grafico PCA 1
+        let pcaChartInstance2 = null; // Riferimento al grafico PCA 2
         
         const modalAI = document.getElementById('ai-modal');
         const modalPCA = document.getElementById('pca-modal');
@@ -427,19 +454,16 @@
         }
 
         // ============================================================================
-        // === MOTORE MATEMATICO PCA (OGGETTIVO E SCIENTIFICO, ZERO LIBRERIE ESTERNE) ===
+        // === MOTORE MATEMATICO PCA (OGGETTIVO E SCIENTIFICO) ===
         // ============================================================================
 
-        // 1. Media
         function getMean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
         
-        // 2. Deviazione Standard (Campionaria)
         function getStdDev(arr, mean) { 
             const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1);
-            return Math.sqrt(variance) || 1e-8; // Evita divisione per zero
+            return Math.sqrt(variance) || 1e-8; 
         }
 
-        // 3. Matrice di Covarianza
         function getCovarianceMatrix(matrix) {
             const nRows = matrix.length;
             const nCols = matrix[0].length;
@@ -451,31 +475,27 @@
                         sum += matrix[k][i] * matrix[k][j];
                     }
                     cov[i][j] = sum / (nRows - 1);
-                    cov[j][i] = cov[i][j]; // La matrice è simmetrica
+                    cov[j][i] = cov[i][j]; 
                 }
             }
             return cov;
         }
 
-        // 4. Eigensolver (Metodo iterativo di Jacobi per matrici simmetriche)
-        // Estremamente stabile per matrici piccole (4x4)
         function jacobiEigenSolver(matrix) {
             const n = matrix.length;
-            let V = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))); // Identità
-            let A = matrix.map(row => [...row]); // Copia
+            let V = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => (i === j ? 1 : 0)));
+            let A = matrix.map(row => [...row]); 
             let maxIter = 100, iter = 0;
 
             while (iter < maxIter) {
-                // Trova elemento off-diagonal massimo
                 let maxVal = 0, p = 0, q = 1;
                 for (let i = 0; i < n; i++) {
                     for (let j = i + 1; j < n; j++) {
                         if (Math.abs(A[i][j]) > maxVal) { maxVal = Math.abs(A[i][j]); p = i; q = j; }
                     }
                 }
-                if (maxVal < 1e-9) break; // Convergenza raggiunta
+                if (maxVal < 1e-9) break; 
 
-                // Calcola angolo di rotazione
                 let theta;
                 if (A[p][p] === A[q][q]) {
                     theta = A[p][q] > 0 ? Math.PI / 4 : -Math.PI / 4;
@@ -485,14 +505,11 @@
 
                 let cosT = Math.cos(theta), sinT = Math.sin(theta);
 
-                // Applica rotazione ad A e V
                 for (let i = 0; i < n; i++) {
-                    // Aggiorna V (Autovettori)
                     let v_ip = V[i][p], v_iq = V[i][q];
                     V[i][p] = cosT * v_ip + sinT * v_iq;
                     V[i][q] = -sinT * v_ip + cosT * v_iq;
 
-                    // Aggiorna A
                     if (i !== p && i !== q) {
                         let a_ip = A[i][p], a_iq = A[i][q];
                         A[i][p] = A[p][i] = cosT * a_ip + sinT * a_iq;
@@ -506,14 +523,10 @@
                 iter++;
             }
 
-            // Estrai autovalori dalla diagonale
             let eigenvalues = [];
             for (let i = 0; i < n; i++) eigenvalues.push({ val: A[i][i], index: i });
-            
-            // Ordina per autovalore decrescente
             eigenvalues.sort((a, b) => b.val - a.val);
 
-            // Riordina autovettori di conseguenza
             let sortedEigenvectors = [];
             for (let i = 0; i < n; i++) {
                 let vec = [];
@@ -521,43 +534,37 @@
                 sortedEigenvectors.push(vec);
             }
 
-            return { 
-                eigenvalues: eigenvalues.map(e => e.val), 
-                eigenvectors: sortedEigenvectors 
-            };
+            return { eigenvalues: eigenvalues.map(e => e.val), eigenvectors: sortedEigenvectors };
         }
 
-        // Funzione Principale PCA e UI
-        window.apriModalPCA = function() {
-            if (archivioDatasetIA.length < 5) {
-                showToast("Dati insufficienti per la PCA. Servono almeno 5 etichette nel Dataset.");
-                return;
-            }
+        // Funzione di utilità per calcolare il giorno dell'anno
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
 
-            // 1. Estrazione dati (T, U, P, Gas)
-            const features = ["temperatura", "umidita", "pressione", "gas_raw"];
-            let rawData = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
-            let labels = archivioDatasetIA.map(row => row.etichetta);
-
-            // 2. Standardizzazione (Fondamentale in scienza dei dati!)
+        // MOTORE DI CALCOLO E RENDERING PCA MODULARE
+        function eseguiEPlottaPCA(features, rawData, labels, canvasId, textContentId, existingChartInstance) {
+            // 1. Standardizzazione
             let means = [], stdDevs = [];
             for (let j = 0; j < features.length; j++) {
                 let col = rawData.map(row => row[j]);
                 means.push(getMean(col));
                 stdDevs.push(getStdDev(col, means[j]));
             }
-
             let zData = rawData.map(row => row.map((val, j) => (val - means[j]) / stdDevs[j]));
 
-            // 3. Calcolo Covarianza e Autovalori/Autovettori
+            // 2. Covarianza e Autovettori
             let covMatrix = getCovarianceMatrix(zData);
             let eigenData = jacobiEigenSolver(covMatrix);
             
-            // 4. Varianza Spiegata
+            // 3. Varianza Spiegata
             let totalVariance = eigenData.eigenvalues.reduce((a, b) => a + b, 0);
             let varExplained = eigenData.eigenvalues.map(val => (val / totalVariance) * 100);
 
-            // 5. Proiezione dati su PC1 e PC2 (Moltiplicazione Matrici)
+            // 4. Proiezione Dati su PC1 e PC2
             let projectedData = [];
             for (let i = 0; i < zData.length; i++) {
                 let pc1 = 0, pc2 = 0;
@@ -568,30 +575,23 @@
                 projectedData.push({ x: pc1, y: pc2, label: labels[i] });
             }
 
-            // 6. Preparazione Testo Descrittivo
+            // 5. Generazione Testo Scientifico
             let mathHTML = "";
             for(let i=0; i<2; i++) {
                 let eq = [];
                 for(let j=0; j<features.length; j++) {
                     let weight = eigenData.eigenvectors[i][j];
-                    eq.push(`${weight >= 0 ? '+' : ''}${weight.toFixed(2)}*${features[j][0].toUpperCase()}`);
+                    let featureName = features[j].toUpperCase();
+                    eq.push(`<span style="display:inline-block; width:120px; text-align:right;">${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${featureName}</span>`);
                 }
-                mathHTML += `<b>PC${i+1}</b> (Spiega il <b>${varExplained[i].toFixed(1)}%</b> dell'informazione):<br>`;
+                mathHTML += `<b>PC${i+1}</b> (Spiega il <b>${varExplained[i].toFixed(1)}%</b> della varianza totale):<br>`;
                 mathHTML += `${eq.join(" ")}<br><br>`;
             }
-            document.getElementById('pca-math-content').innerHTML = mathHTML;
+            document.getElementById(textContentId).innerHTML = mathHTML;
 
-            // 7. Renderizzazione Grafico Chart.js
-            renderPCAChart(projectedData, varExplained);
+            // 6. Plottaggio Scatter
+            const ctx = document.getElementById(canvasId).getContext('2d');
             
-            modalPCA.style.display = 'flex';
-        }
-
-        // --- GESTIONE GRAFICO SCATTER PCA ---
-        function renderPCAChart(dataPoints, varExplained) {
-            const ctx = document.getElementById('pcaChart').getContext('2d');
-            
-            // Separa i punti per serie di colori
             const datasets = [
                 { label: '☀️ Sole/Sereno', color: '#fbc02d', data: [] },
                 { label: '☁️ Nuvoloso', color: '#757575', data: [] },
@@ -599,14 +599,13 @@
                 { label: '❄️ Neve', color: '#e0e0e0', data: [] }
             ];
 
-            dataPoints.forEach(pt => {
+            projectedData.forEach(pt => {
                 if (pt.label === 'Sole_Sereno') datasets[0].data.push({x: pt.x, y: pt.y});
                 else if (pt.label === 'Nuvoloso') datasets[1].data.push({x: pt.x, y: pt.y});
                 else if (pt.label === 'Pioggia') datasets[2].data.push({x: pt.x, y: pt.y});
                 else if (pt.label === 'Neve') datasets[3].data.push({x: pt.x, y: pt.y});
             });
 
-            // Rimuovi serie vuote e mappa al formato Chart.js
             const activeDatasets = datasets.filter(ds => ds.data.length > 0).map(ds => ({
                 label: ds.label,
                 data: ds.data,
@@ -617,9 +616,9 @@
                 pointHoverRadius: 8
             }));
 
-            if (pcaChartInstance) pcaChartInstance.destroy(); // Pulisci grafico vecchio
+            if (existingChartInstance) existingChartInstance.destroy();
 
-            pcaChartInstance = new Chart(ctx, {
+            return new Chart(ctx, {
                 type: 'scatter',
                 data: { datasets: activeDatasets },
                 options: {
@@ -627,24 +626,53 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { labels: { color: '#fff' } },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx) { return `${ctx.dataset.label} (PC1: ${ctx.parsed.x.toFixed(2)}, PC2: ${ctx.parsed.y.toFixed(2)})`; }
-                            }
-                        }
+                        tooltip: { callbacks: { label: function(ctx) { return `${ctx.dataset.label}`; } } }
                     },
                     scales: {
-                        x: { 
-                            title: { display: true, text: `Componente Principale 1`, color: '#aaa' },
-                            ticks: { color: '#aaa' }, grid: { color: '#333' }
-                        },
-                        y: { 
-                            title: { display: true, text: `Componente Principale 2`, color: '#aaa' },
-                            ticks: { color: '#aaa' }, grid: { color: '#333' }
-                        }
+                        x: { title: { display: true, text: `PC 1 (${varExplained[0].toFixed(1)}%)`, color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { title: { display: true, text: `PC 2 (${varExplained[1].toFixed(1)}%)`, color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#333' } }
                     }
                 }
             });
+        }
+
+        // Gestore UI Principale
+        window.apriModalPCA = function() {
+            if (archivioDatasetIA.length < 5) {
+                showToast("Dati insufficienti per la PCA. Servono almeno 5 etichette nel Dataset.");
+                return;
+            }
+
+            // CORREZIONE BUG RENDERING: 
+            // Mostriamo il modale PRIMA di calcolare e renderizzare i grafici, 
+            // in modo che Chart.js possa leggere l'altezza reale (500px) del contenitore e non 0.
+            modalPCA.style.display = 'flex';
+
+            let labels = archivioDatasetIA.map(row => row.etichetta);
+
+            // --- TEST 1: PCA SOLO FISICA (4 Dimensioni) ---
+            const features1 = ["Temp", "Umid", "Press", "Gas"];
+            let rawData1 = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
+            
+            pcaChartInstance1 = eseguiEPlottaPCA(features1, rawData1, labels, 'pcaChart1', 'pca-math-content1', pcaChartInstance1);
+
+            // --- TEST 2: PCA FISICA + TEMPO CICLICO (8 Dimensioni) ---
+            const features2 = ["Temp", "Umid", "Press", "Gas", "Min_Sin", "Min_Cos", "Day_Sin", "Day_Cos"];
+            let rawData2 = archivioDatasetIA.map(row => {
+                let d = new Date(row.timestamp * 1000);
+                let minuti_giornata = (d.getHours() * 60) + d.getMinutes();
+                let giorno_anno = getDayOfYear(d);
+
+                // Trasformazione Trigonometrica
+                let min_sin = Math.sin(2 * Math.PI * minuti_giornata / 1440);
+                let min_cos = Math.cos(2 * Math.PI * minuti_giornata / 1440);
+                let day_sin = Math.sin(2 * Math.PI * giorno_anno / 365.25);
+                let day_cos = Math.cos(2 * Math.PI * giorno_anno / 365.25);
+
+                return [row.temperatura, row.umidita, row.pressione, row.gas_raw, min_sin, min_cos, day_sin, day_cos];
+            });
+
+            pcaChartInstance2 = eseguiEPlottaPCA(features2, rawData2, labels, 'pcaChart2', 'pca-math-content2', pcaChartInstance2);
         }
 
 
