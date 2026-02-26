@@ -51,27 +51,32 @@
         }
         .ai-btn-close:hover { background-color: #444; color: #fff; }
 
-        /* Nuovo Pulsante Correzione AI */
-        .btn-correct-ai {
-            background-color: transparent;
-            border: 1px solid #00e676;
-            color: #00e676;
-            padding: 6px 15px;
-            border-radius: 6px;
-            font-size: 0.85em;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        /* Pulsanti Box IA */
+        .btn-correct-ai, .btn-pca {
+            background-color: transparent; border-radius: 6px; font-size: 0.85em;
+            cursor: pointer; margin-top: 10px; transition: all 0.2s ease;
+            text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 15px; width: 100%; box-sizing: border-box;
         }
-        .btn-correct-ai:hover {
-            background-color: #00e676;
-            color: #121212;
-            font-weight: bold;
-        }
+        .btn-correct-ai { border: 1px solid #00e676; color: #00e676; }
+        .btn-correct-ai:hover { background-color: #00e676; color: #121212; font-weight: bold; }
+        
+        .btn-pca { border: 1px solid #448aff; color: #448aff; margin-top: 10px;}
+        .btn-pca:hover { background-color: #448aff; color: #121212; font-weight: bold; }
 
-        /* Notifiche Toast (Sostituiscono gli alert) */
+        /* --- STILE PER IL POPUP PCA --- */
+        .pca-modal-content {
+            background-color: #1e1e1e; border: 2px solid #448aff; border-radius: 12px;
+            padding: 20px; text-align: left; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(68, 138, 255, 0.2);
+            display: flex; flex-direction: column;
+        }
+        .pca-chart-container { width: 100%; height: 350px; background-color: #2c2c2c; border-radius: 8px; padding: 10px; box-sizing: border-box; margin-bottom: 20px;}
+        .pca-text-box { background-color: #2c2c2c; padding: 15px; border-radius: 8px; font-size: 0.9em; line-height: 1.5; color: #ddd;}
+        .pca-text-box h3 { color: #448aff; margin-top: 0; margin-bottom: 10px; font-size: 1.2em;}
+        .pca-math { font-family: monospace; background: #121212; padding: 10px; border-radius: 5px; color: #00e676; overflow-x: auto;}
+        .pca-close-wrapper { text-align: center; margin-top: 20px; }
+
+        /* Notifiche Toast */
         .toast {
             position: fixed; bottom: 20px; right: 20px;
             background-color: #333; color: #fff;
@@ -126,32 +131,22 @@
         .charts-wrapper {
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px; 
-            width: 100%; 
-            max-width: 1000px; 
-            margin-top: 25px;
+            gap: 20px; width: 100%; max-width: 1000px; margin-top: 25px;
         }
         .chart-container {
-            width: 100%; 
-            height: 280px; 
-            background-color: #1e1e1e; 
-            border-radius: 12px;
-            padding: 20px; 
-            box-sizing: border-box; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 100%; height: 280px; background-color: #1e1e1e; 
+            border-radius: 12px; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         .trend { font-size: 0.4em; margin-left: 10px; vertical-align: middle; }
         .trend-small { font-size: 0.8em; margin-left: 5px; }
         
         .min-max-box { margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; font-size: 0.9em; color: #ccc; display: flex; justify-content: space-around; }
-        /* CORREZIONE SPECIFICITA' CSS: Il colore bianco si applica SOLO ai numeri, non alle freccette */
         .min-max-item span[id^="val-"] { font-weight: bold; color: #fff; }
 
-        /* CORREZIONE REGOLA COLORI TREND (Rese assolute per dominare sui contenitori) */
-        span.up { color: #00e676 !important; }     /* Verde: Aumento */
-        span.down { color: #ff5252 !important; }   /* Rosso: Diminuzione */
-        span.stable { color: #888888 !important; } /* Grigio: Costante (entro il margine d'errore) */
+        span.up { color: #00e676 !important; }     
+        span.down { color: #ff5252 !important; }   
+        span.stable { color: #888888 !important; } 
 
         .timestamp { margin-top: 30px; color: #888888; font-size: 0.9em; text-align: center;}
         .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
@@ -173,7 +168,31 @@
                 <button class="ai-btn btn-neve" onclick="salvaDatasetIA('Neve')">❄️ Neve</button>
             </div>
             
-            <button class="ai-btn-close" onclick="chiudiModalTemporaneamente()">Non ora / Chiudi</button>
+            <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('ai-modal')">Non ora / Chiudi</button>
+        </div>
+    </div>
+
+    <!-- NUOVO OVERLAY POPUP PER PCA -->
+    <div class="ai-modal-overlay" id="pca-modal">
+        <div class="pca-modal-content">
+            <div class="ai-modal-title" style="color: #448aff;">Analisi delle Componenti Principali (PCA) 🔬</div>
+            <div class="ai-modal-desc">Proiezione delle 4 grandezze fisiche (T, U, P, Gas) su un piano bidimensionale. I cluster separati indicano che i sensori distinguono bene le condizioni meteo.</div>
+            
+            <div class="pca-chart-container">
+                <canvas id="pcaChart"></canvas>
+            </div>
+
+            <div class="pca-text-box" id="pca-details">
+                <h3>Autovettori e Autovalori (Feature Importance)</h3>
+                <div id="pca-math-content" class="pca-math">Calcolo matematico in corso...</div>
+                <p style="margin-top:15px; font-size: 0.85em; color: #aaa;">
+                    * I coefficienti (pesi) dell'autovettore indicano quanto una specifica grandezza fisica contribuisce a quella componente. Valori assoluti alti significano forte influenza.
+                </p>
+            </div>
+
+            <div class="pca-close-wrapper">
+                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('pca-modal')">Chiudi Analisi</button>
+            </div>
         </div>
     </div>
 
@@ -188,15 +207,20 @@
         <div class="forecast-text" id="forecast-output">Analisi dati in corso... (Richiede 3h di storico)</div>
     </div>
 
-    <!-- NUOVO BOX: Predizione AI Real-Time -->
+    <!-- Box Predizione AI Real-Time -->
     <div class="forecast-box" style="border-color: #00e676; position: relative;">
-        <div class="forecast-title" style="color: #00e676;">Meteo attuale previsto</div>
+        <div class="forecast-title" style="color: #00e676;">Meteo attuale previsto (Machine Learning)</div>
         <div class="forecast-text" id="ai-prediction-output">Addestramento in corso... (Richiede Dati)</div>
         <div id="ai-prediction-details" style="font-size: 0.8em; color: #888; margin-top: 5px; margin-bottom: 10px;"></div>
         
-        <button class="btn-correct-ai" onclick="apriModalManualmente()">
-            La previsione è errata? Correggila, clicca qui
-        </button>
+        <div style="display: flex; gap: 10px; flex-direction: column; align-items: center; max-width: 400px; margin: 0 auto;">
+            <button class="btn-correct-ai" onclick="apriModalManualmente()">
+                La previsione è errata? Correggila
+            </button>
+            <button class="btn-pca" onclick="apriModalPCA()">
+                📊 Visualizza analisi PCA (Clustering e Pesi)
+            </button>
+        </div>
     </div>
 
     <!-- Banner Allarmi Dinamico -->
@@ -278,8 +302,10 @@
         // --- MEMORIA GLOBALE ---
         let ultimaLetturaSensori = null;
         let archivioDatasetIA = []; 
+        let pcaChartInstance = null; // Riferimento al grafico PCA
         
-        const modal = document.getElementById('ai-modal');
+        const modalAI = document.getElementById('ai-modal');
+        const modalPCA = document.getElementById('pca-modal');
         const TEMPO_ATTESA_MS = 3600000; 
 
         // --- GESTIONE NOTIFICHE TOAST ---
@@ -295,13 +321,13 @@
             const lastTime = localStorage.getItem('lastLabelTime');
             const now = Date.now();
             if (!lastTime || (now - parseInt(lastTime)) > TEMPO_ATTESA_MS) {
-                modal.style.display = 'flex';
+                modalAI.style.display = 'flex';
             }
         }
 
-        window.chiudiModalTemporaneamente = function() {
-            localStorage.setItem('lastLabelTime', Date.now());
-            modal.style.display = 'none';
+        window.chiudiModalTemporaneamente = function(modalId) {
+            if(modalId === 'ai-modal') localStorage.setItem('lastLabelTime', Date.now());
+            document.getElementById(modalId).style.display = 'none';
         }
 
         window.apriModalManualmente = function() {
@@ -309,7 +335,7 @@
                 showToast("Attendi l'arrivo dei dati dai sensori prima di correggere l'IA."); 
                 return; 
             }
-            modal.style.display = 'flex';
+            modalAI.style.display = 'flex';
         }
 
         window.salvaDatasetIA = function(scenario) {
@@ -329,7 +355,7 @@
 
             push(ref(db, 'DatasetIA'), datasetRecord)
                 .then(() => { 
-                    window.chiudiModalTemporaneamente(); 
+                    window.chiudiModalTemporaneamente('ai-modal'); 
                     showToast("Dati salvati! L'IA è stata aggiornata.", true);
                 })
                 .catch((error) => { 
@@ -348,7 +374,7 @@
             eseguiPredizioneIA(); 
         });
 
-        // --- ALGORITMO MACHINE LEARNING ---
+        // --- ALGORITMO MACHINE LEARNING (k-NN) ---
         function eseguiPredizioneIA() {
             if (!ultimaLetturaSensori) return;
             const outEl = document.getElementById('ai-prediction-output');
@@ -361,11 +387,8 @@
             }
 
             const k = Math.min(5, archivioDatasetIA.length);
-            
-            let minT = Infinity, maxT = -Infinity;
-            let minH = Infinity, maxH = -Infinity;
-            let minP = Infinity, maxP = -Infinity;
-            let minG = Infinity, maxG = -Infinity;
+            let minT = Infinity, maxT = -Infinity, minH = Infinity, maxH = -Infinity;
+            let minP = Infinity, maxP = -Infinity, minG = Infinity, maxG = -Infinity;
 
             [...archivioDatasetIA, ultimaLetturaSensori].forEach(r => {
                 if (r.temperatura < minT) minT = r.temperatura; if (r.temperatura > maxT) maxT = r.temperatura;
@@ -381,7 +404,6 @@
                 const dH = normalize(ultimaLetturaSensori.umidita, minH, maxH) - normalize(record.umidita, minH, maxH);
                 const dP = normalize(ultimaLetturaSensori.pressione, minP, maxP) - normalize(record.pressione, minP, maxP);
                 const dG = normalize(ultimaLetturaSensori.gas_raw, minG, maxG) - normalize(record.gas_raw, minG, maxG);
-
                 return { etichetta: record.etichetta, distanza: Math.sqrt(dT*dT + dH*dH + dP*dP + dG*dG) };
             });
 
@@ -390,17 +412,13 @@
             const conteggio = {};
             kNearest.forEach(vicino => conteggio[vicino.etichetta] = (conteggio[vicino.etichetta] || 0) + 1);
 
-            let bestLabel = "";
-            let maxCount = 0;
+            let bestLabel = "", maxCount = 0;
             let probStats = [];
 
             for (const [etichetta, count] of Object.entries(conteggio)) {
                 const prob = Math.round((count / k) * 100);
                 probStats.push(`${etichetta.replace('_', ' ')}: ${prob}%`);
-                if (count > maxCount) {
-                    maxCount = count;
-                    bestLabel = etichetta;
-                }
+                if (count > maxCount) { maxCount = count; bestLabel = etichetta; }
             }
 
             const icone = { "Sole_Sereno": "☀️ Sole/Sereno", "Nuvoloso": "☁️ Nuvoloso", "Pioggia": "🌧️ Pioggia", "Neve": "❄️ Neve" };
@@ -408,47 +426,246 @@
             detEl.innerHTML = `Affidabilità: calcolata sui ${k} scenari passati più simili. <br> Distribuzione: ${probStats.join(' | ')}`;
         }
 
+        // ============================================================================
+        // === MOTORE MATEMATICO PCA (OGGETTIVO E SCIENTIFICO, ZERO LIBRERIE ESTERNE) ===
+        // ============================================================================
 
-        // --- INIZIALIZZAZIONE 4 GRAFICI SEPARATI (REFACTORING) ---
-        // Funzione di utilità per creare i grafici dinamicamente mantenendo il codice pulito
-        function initSingleChart(canvasId, label, colorHex, bgColorRgba) {
-            return new Chart(document.getElementById(canvasId).getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: label,
-                        borderColor: colorHex,
-                        backgroundColor: bgColorRgba,
-                        data: [],
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
+        // 1. Media
+        function getMean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+        
+        // 2. Deviazione Standard (Campionaria)
+        function getStdDev(arr, mean) { 
+            const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1);
+            return Math.sqrt(variance) || 1e-8; // Evita divisione per zero
+        }
+
+        // 3. Matrice di Covarianza
+        function getCovarianceMatrix(matrix) {
+            const nRows = matrix.length;
+            const nCols = matrix[0].length;
+            let cov = Array(nCols).fill(0).map(() => Array(nCols).fill(0));
+            for (let i = 0; i < nCols; i++) {
+                for (let j = i; j < nCols; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < nRows; k++) {
+                        sum += matrix[k][i] * matrix[k][j];
+                    }
+                    cov[i][j] = sum / (nRows - 1);
+                    cov[j][i] = cov[i][j]; // La matrice è simmetrica
+                }
+            }
+            return cov;
+        }
+
+        // 4. Eigensolver (Metodo iterativo di Jacobi per matrici simmetriche)
+        // Estremamente stabile per matrici piccole (4x4)
+        function jacobiEigenSolver(matrix) {
+            const n = matrix.length;
+            let V = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))); // Identità
+            let A = matrix.map(row => [...row]); // Copia
+            let maxIter = 100, iter = 0;
+
+            while (iter < maxIter) {
+                // Trova elemento off-diagonal massimo
+                let maxVal = 0, p = 0, q = 1;
+                for (let i = 0; i < n; i++) {
+                    for (let j = i + 1; j < n; j++) {
+                        if (Math.abs(A[i][j]) > maxVal) { maxVal = Math.abs(A[i][j]); p = i; q = j; }
+                    }
+                }
+                if (maxVal < 1e-9) break; // Convergenza raggiunta
+
+                // Calcola angolo di rotazione
+                let theta;
+                if (A[p][p] === A[q][q]) {
+                    theta = A[p][q] > 0 ? Math.PI / 4 : -Math.PI / 4;
+                } else {
+                    theta = 0.5 * Math.atan((2 * A[p][q]) / (A[p][p] - A[q][q]));
+                }
+
+                let cosT = Math.cos(theta), sinT = Math.sin(theta);
+
+                // Applica rotazione ad A e V
+                for (let i = 0; i < n; i++) {
+                    // Aggiorna V (Autovettori)
+                    let v_ip = V[i][p], v_iq = V[i][q];
+                    V[i][p] = cosT * v_ip + sinT * v_iq;
+                    V[i][q] = -sinT * v_ip + cosT * v_iq;
+
+                    // Aggiorna A
+                    if (i !== p && i !== q) {
+                        let a_ip = A[i][p], a_iq = A[i][q];
+                        A[i][p] = A[p][i] = cosT * a_ip + sinT * a_iq;
+                        A[i][q] = A[q][i] = -sinT * a_ip + cosT * a_iq;
+                    }
+                }
+                let a_pp = A[p][p], a_qq = A[q][q], a_pq = A[p][q];
+                A[p][p] = cosT * cosT * a_pp + 2 * cosT * sinT * a_pq + sinT * sinT * a_qq;
+                A[q][q] = sinT * sinT * a_pp - 2 * cosT * sinT * a_pq + cosT * cosT * a_qq;
+                A[p][q] = A[q][p] = 0;
+                iter++;
+            }
+
+            // Estrai autovalori dalla diagonale
+            let eigenvalues = [];
+            for (let i = 0; i < n; i++) eigenvalues.push({ val: A[i][i], index: i });
+            
+            // Ordina per autovalore decrescente
+            eigenvalues.sort((a, b) => b.val - a.val);
+
+            // Riordina autovettori di conseguenza
+            let sortedEigenvectors = [];
+            for (let i = 0; i < n; i++) {
+                let vec = [];
+                for (let j = 0; j < n; j++) vec.push(V[j][eigenvalues[i].index]);
+                sortedEigenvectors.push(vec);
+            }
+
+            return { 
+                eigenvalues: eigenvalues.map(e => e.val), 
+                eigenvectors: sortedEigenvectors 
+            };
+        }
+
+        // Funzione Principale PCA e UI
+        window.apriModalPCA = function() {
+            if (archivioDatasetIA.length < 5) {
+                showToast("Dati insufficienti per la PCA. Servono almeno 5 etichette nel Dataset.");
+                return;
+            }
+
+            // 1. Estrazione dati (T, U, P, Gas)
+            const features = ["temperatura", "umidita", "pressione", "gas_raw"];
+            let rawData = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
+            let labels = archivioDatasetIA.map(row => row.etichetta);
+
+            // 2. Standardizzazione (Fondamentale in scienza dei dati!)
+            let means = [], stdDevs = [];
+            for (let j = 0; j < features.length; j++) {
+                let col = rawData.map(row => row[j]);
+                means.push(getMean(col));
+                stdDevs.push(getStdDev(col, means[j]));
+            }
+
+            let zData = rawData.map(row => row.map((val, j) => (val - means[j]) / stdDevs[j]));
+
+            // 3. Calcolo Covarianza e Autovalori/Autovettori
+            let covMatrix = getCovarianceMatrix(zData);
+            let eigenData = jacobiEigenSolver(covMatrix);
+            
+            // 4. Varianza Spiegata
+            let totalVariance = eigenData.eigenvalues.reduce((a, b) => a + b, 0);
+            let varExplained = eigenData.eigenvalues.map(val => (val / totalVariance) * 100);
+
+            // 5. Proiezione dati su PC1 e PC2 (Moltiplicazione Matrici)
+            let projectedData = [];
+            for (let i = 0; i < zData.length; i++) {
+                let pc1 = 0, pc2 = 0;
+                for (let j = 0; j < features.length; j++) {
+                    pc1 += zData[i][j] * eigenData.eigenvectors[0][j];
+                    pc2 += zData[i][j] * eigenData.eigenvectors[1][j];
+                }
+                projectedData.push({ x: pc1, y: pc2, label: labels[i] });
+            }
+
+            // 6. Preparazione Testo Descrittivo
+            let mathHTML = "";
+            for(let i=0; i<2; i++) {
+                let eq = [];
+                for(let j=0; j<features.length; j++) {
+                    let weight = eigenData.eigenvectors[i][j];
+                    eq.push(`${weight >= 0 ? '+' : ''}${weight.toFixed(2)}*${features[j][0].toUpperCase()}`);
+                }
+                mathHTML += `<b>PC${i+1}</b> (Spiega il <b>${varExplained[i].toFixed(1)}%</b> dell'informazione):<br>`;
+                mathHTML += `${eq.join(" ")}<br><br>`;
+            }
+            document.getElementById('pca-math-content').innerHTML = mathHTML;
+
+            // 7. Renderizzazione Grafico Chart.js
+            renderPCAChart(projectedData, varExplained);
+            
+            modalPCA.style.display = 'flex';
+        }
+
+        // --- GESTIONE GRAFICO SCATTER PCA ---
+        function renderPCAChart(dataPoints, varExplained) {
+            const ctx = document.getElementById('pcaChart').getContext('2d');
+            
+            // Separa i punti per serie di colori
+            const datasets = [
+                { label: '☀️ Sole/Sereno', color: '#fbc02d', data: [] },
+                { label: '☁️ Nuvoloso', color: '#757575', data: [] },
+                { label: '🌧️ Pioggia', color: '#1976d2', data: [] },
+                { label: '❄️ Neve', color: '#e0e0e0', data: [] }
+            ];
+
+            dataPoints.forEach(pt => {
+                if (pt.label === 'Sole_Sereno') datasets[0].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Nuvoloso') datasets[1].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Pioggia') datasets[2].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Neve') datasets[3].data.push({x: pt.x, y: pt.y});
+            });
+
+            // Rimuovi serie vuote e mappa al formato Chart.js
+            const activeDatasets = datasets.filter(ds => ds.data.length > 0).map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: ds.color,
+                borderColor: '#ffffff',
+                borderWidth: 1,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }));
+
+            if (pcaChartInstance) pcaChartInstance.destroy(); // Pulisci grafico vecchio
+
+            pcaChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: activeDatasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { labels: { color: '#fff' } } },
+                    plugins: {
+                        legend: { labels: { color: '#fff' } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) { return `${ctx.dataset.label} (PC1: ${ctx.parsed.x.toFixed(2)}, PC2: ${ctx.parsed.y.toFixed(2)})`; }
+                            }
+                        }
+                    },
                     scales: {
-                        x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } },
-                        y: { type: 'linear', position: 'left', ticks: { color: colorHex }, grid: { color: '#333' } }
+                        x: { 
+                            title: { display: true, text: `Componente Principale 1 (${varExplained[0].toFixed(1)}% Varianza)`, color: '#aaa' },
+                            ticks: { color: '#aaa' }, grid: { color: '#333' }
+                        },
+                        y: { 
+                            title: { display: true, text: `Componente Principale 2 (${varExplained[1].toFixed(1)}% Varianza)`, color: '#aaa' },
+                            ticks: { color: '#aaa' }, grid: { color: '#333' }
+                        }
                     }
                 }
             });
         }
 
-        // Creazione Istanze Grafici
+
+        // --- INIZIALIZZAZIONE 4 GRAFICI SEPARATI (STANDARD) ---
+        function initSingleChart(canvasId, label, colorHex, bgColorRgba) {
+            return new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: label, borderColor: colorHex, backgroundColor: bgColorRgba, data: [], borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: { x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } }, y: { type: 'linear', position: 'left', ticks: { color: colorHex }, grid: { color: '#333' } } }
+                }
+            });
+        }
+
         const tempChart = initSingleChart('tempChart', 'Temperatura (°C)', '#ff5252', 'rgba(255, 82, 82, 0.1)');
         const umidChart = initSingleChart('umidChart', 'Umidità (%)', '#448aff', 'rgba(68, 138, 255, 0.1)');
         const pressChart = initSingleChart('pressChart', 'Pressione (hPa)', '#b2ff59', 'rgba(178, 255, 89, 0.1)');
         const gasChart = initSingleChart('gasChart', 'Gas (Raw)', '#ffc400', 'rgba(255, 196, 0, 0.1)');
 
-
-        // CORREZIONE LOGICA FRECCETTE: Eliminata l'inversione, si usa la regola standard.
-        // Aumenta = Verde (up), Diminuisce = Rosso (down), Stabile = Grigio (stable)
         function getTrendHTML(delta, threshold) { 
             if (delta > threshold) return '<span class="up">▲</span>'; 
             if (delta < -threshold) return '<span class="down">▼</span>'; 
@@ -494,7 +711,6 @@
 
                     document.getElementById('trend-temp').innerHTML = getTrendHTML(deltaT, 0.2);
                     document.getElementById('trend-umid').innerHTML = getTrendHTML(deltaH, 1.0);
-                    // Rimosso l'inversione colore per pressione per seguire la regola universale
                     document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5); 
                     document.getElementById('trend-gas').innerHTML = getTrendHTML(deltaG, 20);
 
@@ -514,18 +730,13 @@
                         tempData.push(rec.temperatura); pressData.push(rec.pressione); umidData.push(rec.umidita); gasData.push(rec.gas_raw);
                     });
 
-                    // FUNZIONE MATEMATICA: Media Mobile Semplice (Filtro Passa-Basso)
-                    // Applicata ai dati del Gas per eliminare l'errore di quantizzazione dell'ADC a gradini
-                    // e ricostruire la curva continua di diffusione fluida reale nel tempo.
-                    const windowSize = 5; // Smussamento basato sugli ultimi 5 campioni
+                    const windowSize = 5; 
                     const smoothedGasData = gasData.map((val, idx, arr) => {
                         const start = Math.max(0, idx - windowSize + 1);
                         const subset = arr.slice(start, idx + 1);
-                        const sum = subset.reduce((a, b) => a + b, 0);
-                        return sum / subset.length;
+                        return subset.reduce((a, b) => a + b, 0) / subset.length;
                     });
 
-                    // Aggiornamento dei 4 grafici separati (Gas utilizza i dati smussati)
                     tempChart.data.labels = labels; tempChart.data.datasets[0].data = tempData; tempChart.update();
                     umidChart.data.labels = labels; umidChart.data.datasets[0].data = umidData; umidChart.update();
                     pressChart.data.labels = labels; pressChart.data.datasets[0].data = pressData; pressChart.update();
@@ -549,7 +760,6 @@
                         
                         document.getElementById('trend-max').innerHTML = getTrendHTML(max24 - maxPrev, 0.2); document.getElementById('trend-min').innerHTML = getTrendHTML(min24 - minPrev, 0.2);
                         document.getElementById('trend-umax').innerHTML = getTrendHTML(maxU24 - maxUPrev, 1.0); document.getElementById('trend-umin').innerHTML = getTrendHTML(minU24 - minUPrev, 1.0);
-                        // Rimosso l'inversione colore per pressione per seguire la regola universale
                         document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5); document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5);
                         document.getElementById('trend-gmax').innerHTML = getTrendHTML(maxG24 - maxGPrev, 20); document.getElementById('trend-gmin').innerHTML = getTrendHTML(minG24 - minGPrev, 20);
                     }
