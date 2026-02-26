@@ -122,16 +122,36 @@
         .label { font-size: 1.2em; color: #bbbbbb; }
         .sub-label { font-size: 0.8em; color: #888; margin-top: -10px; margin-bottom: 10px; display: block;}
         
-        /* Grafici e Trend */
-        .chart-container {
-            width: 100%; max-width: 1000px; height: 350px; background-color: #1e1e1e; border-radius: 12px;
-            padding: 20px; margin-top: 25px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        /* Modifica Architettura Grafici: Wrapper e Layout */
+        .charts-wrapper {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px; 
+            width: 100%; 
+            max-width: 1000px; 
+            margin-top: 25px;
         }
+        .chart-container {
+            width: 100%; 
+            height: 280px; 
+            background-color: #1e1e1e; 
+            border-radius: 12px;
+            padding: 20px; 
+            box-sizing: border-box; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
         .trend { font-size: 0.4em; margin-left: 10px; vertical-align: middle; }
         .trend-small { font-size: 0.8em; margin-left: 5px; }
-        .up { color: #ff5252; } .down { color: #448aff; } .stable { color: #888; } 
+        
         .min-max-box { margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; font-size: 0.9em; color: #ccc; display: flex; justify-content: space-around; }
-        .min-max-item span { font-weight: bold; color: #fff; }
+        /* CORREZIONE SPECIFICITA' CSS: Il colore bianco si applica SOLO ai numeri, non alle freccette */
+        .min-max-item span[id^="val-"] { font-weight: bold; color: #fff; }
+
+        /* CORREZIONE REGOLA COLORI TREND (Rese assolute per dominare sui contenitori) */
+        span.up { color: #00e676 !important; }     /* Verde: Aumento */
+        span.down { color: #ff5252 !important; }   /* Rosso: Diminuzione */
+        span.stable { color: #888888 !important; } /* Grigio: Costante (entro il margine d'errore) */
 
         .timestamp { margin-top: 30px; color: #888888; font-size: 0.9em; text-align: center;}
         .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
@@ -174,7 +194,6 @@
         <div class="forecast-text" id="ai-prediction-output">Addestramento in corso... (Richiede Dati)</div>
         <div id="ai-prediction-details" style="font-size: 0.8em; color: #888; margin-top: 5px; margin-bottom: 10px;"></div>
         
-        <!-- Pulsante Inserito per Active Learning -->
         <button class="btn-correct-ai" onclick="apriModalManualmente()">
             La previsione è errata? Correggila, clicca qui
         </button>
@@ -223,9 +242,13 @@
         </div>
     </div>
 
-    <!-- Contenitori Grafici -->
-    <div class="chart-container"><canvas id="weatherChart"></canvas></div>
-    <div class="chart-container"><canvas id="hygroGasChart"></canvas></div>
+    <!-- Contenitori Grafici 4x Separati -->
+    <div class="charts-wrapper">
+        <div class="chart-container"><canvas id="tempChart"></canvas></div>
+        <div class="chart-container"><canvas id="umidChart"></canvas></div>
+        <div class="chart-container"><canvas id="pressChart"></canvas></div>
+        <div class="chart-container"><canvas id="gasChart"></canvas></div>
+    </div>
 
     <div class="timestamp" id="last-update">Ultimo aggiornamento: In attesa di connessione...</div>
 
@@ -268,7 +291,6 @@
             setTimeout(() => { toast.classList.remove('show'); }, 3000);
         }
 
-        // --- GESTIONE POPUP ORACLE ---
         function controllaTimerPopup() {
             const lastTime = localStorage.getItem('lastLabelTime');
             const now = Date.now();
@@ -305,7 +327,6 @@
                 timestamp: Math.floor(Date.now() / 1000)
             };
 
-            // Ottimizzato per Firebase v10: push restituisce già una promise
             push(ref(db, 'DatasetIA'), datasetRecord)
                 .then(() => { 
                     window.chiudiModalTemporaneamente(); 
@@ -318,20 +339,18 @@
         }
         setTimeout(controllaTimerPopup, 3000);
 
-        // --- LETTURA DATASET IA (CORRETTO BUG FOREACH) ---
+        // --- LETTURA DATASET IA ---
         onValue(datasetIARef, (snapshot) => {
             archivioDatasetIA = [];
             snapshot.forEach((child) => {
-                // BUG FIX: L'aggiunta delle graffe impedisce il return implicito che rompeva il ciclo
                 archivioDatasetIA.push(child.val());
             });
-            eseguiPredizioneIA(); // Ricalcola se il dataset cambia
+            eseguiPredizioneIA(); 
         });
 
-        // --- ALGORITMO MACHINE LEARNING (k-NN) SCIENTIFICO ---
+        // --- ALGORITMO MACHINE LEARNING ---
         function eseguiPredizioneIA() {
             if (!ultimaLetturaSensori) return;
-
             const outEl = document.getElementById('ai-prediction-output');
             const detEl = document.getElementById('ai-prediction-details');
 
@@ -343,13 +362,11 @@
 
             const k = Math.min(5, archivioDatasetIA.length);
             
-            // 1. Calcolo Min-Max Scaling Dinamico per Normalizzazione Scientifica
             let minT = Infinity, maxT = -Infinity;
             let minH = Infinity, maxH = -Infinity;
             let minP = Infinity, maxP = -Infinity;
             let minG = Infinity, maxG = -Infinity;
 
-            // Includo sia l'archivio sia il dato attuale per trovare i limiti spaziali reali
             [...archivioDatasetIA, ultimaLetturaSensori].forEach(r => {
                 if (r.temperatura < minT) minT = r.temperatura; if (r.temperatura > maxT) maxT = r.temperatura;
                 if (r.umidita < minH) minH = r.umidita; if (r.umidita > maxH) maxH = r.umidita;
@@ -357,33 +374,22 @@
                 if (r.gas_raw < minG) minG = r.gas_raw; if (r.gas_raw > maxG) maxG = r.gas_raw;
             });
 
-            // Funzione di utilità per evitare divisioni per zero
             const normalize = (val, min, max) => (max === min) ? 0 : (val - min) / (max - min);
 
-            // 2. Calcolo Distanza Euclidea NORMALIZZATA
             const distanze = archivioDatasetIA.map(record => {
                 const dT = normalize(ultimaLetturaSensori.temperatura, minT, maxT) - normalize(record.temperatura, minT, maxT);
                 const dH = normalize(ultimaLetturaSensori.umidita, minH, maxH) - normalize(record.umidita, minH, maxH);
                 const dP = normalize(ultimaLetturaSensori.pressione, minP, maxP) - normalize(record.pressione, minP, maxP);
                 const dG = normalize(ultimaLetturaSensori.gas_raw, minG, maxG) - normalize(record.gas_raw, minG, maxG);
 
-                const distanza = Math.sqrt(dT*dT + dH*dH + dP*dP + dG*dG);
-                return { etichetta: record.etichetta, distanza: distanza };
+                return { etichetta: record.etichetta, distanza: Math.sqrt(dT*dT + dH*dH + dP*dP + dG*dG) };
             });
 
-            // 3. Ordina dal più vicino (distanza minore) al più lontano
             distanze.sort((a, b) => a.distanza - b.distanza);
-
-            // 4. Prendi i 'k' punti più vicini
             const kNearest = distanze.slice(0, k);
-
-            // 5. Conta le frequenze delle etichette nei k punti
             const conteggio = {};
-            kNearest.forEach(vicino => {
-                conteggio[vicino.etichetta] = (conteggio[vicino.etichetta] || 0) + 1;
-            });
+            kNearest.forEach(vicino => conteggio[vicino.etichetta] = (conteggio[vicino.etichetta] || 0) + 1);
 
-            // 6. Estrai il risultato più probabile
             let bestLabel = "";
             let maxCount = 0;
             let probStats = [];
@@ -397,28 +403,58 @@
                 }
             }
 
-            const icone = {
-                "Sole_Sereno": "☀️ Sole/Sereno",
-                "Nuvoloso": "☁️ Nuvoloso",
-                "Pioggia": "🌧️ Pioggia",
-                "Neve": "❄️ Neve"
-            };
-
-            const probFinale = Math.round((maxCount / k) * 100);
-            
-            outEl.innerHTML = `${icone[bestLabel]} (${probFinale}%)`;
+            const icone = { "Sole_Sereno": "☀️ Sole/Sereno", "Nuvoloso": "☁️ Nuvoloso", "Pioggia": "🌧️ Pioggia", "Neve": "❄️ Neve" };
+            outEl.innerHTML = `${icone[bestLabel]} (${Math.round((maxCount / k) * 100)}%)`;
             detEl.innerHTML = `Affidabilità: calcolata sui ${k} scenari passati più simili. <br> Distribuzione: ${probStats.join(' | ')}`;
         }
 
 
-        // --- INIZIALIZZAZIONE GRAFICI ---
-        const ctx = document.getElementById('weatherChart').getContext('2d');
-        const weatherChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [ { label: 'Temp (°C)', yAxisID: 'yTemp', borderColor: '#ff5252', backgroundColor: 'rgba(255, 82, 82, 0.1)', data: [], borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }, { label: 'Press (hPa)', yAxisID: 'yPress', borderColor: '#b2ff59', data: [], borderWidth: 2, pointRadius: 0, tension: 0.4 } ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#fff' } } }, scales: { x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } }, yTemp: { type: 'linear', position: 'left', ticks: { color: '#ff5252' }, grid: { color: '#333' } }, yPress: { type: 'linear', position: 'right', ticks: { color: '#b2ff59' }, grid: { display: false } } } } });
-        
-        const ctx2 = document.getElementById('hygroGasChart').getContext('2d');
-        const hygroGasChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Umidità (%)', yAxisID: 'yUmid', borderColor: '#448aff', backgroundColor: 'rgba(68, 138, 255, 0.1)', data: [], borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }, { label: 'Gas (Raw)', yAxisID: 'yGas', borderColor: '#ffc400', data: [], borderWidth: 2, pointRadius: 0, tension: 0.4 } ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#fff' } } }, scales: { x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } }, yUmid: { type: 'linear', position: 'left', ticks: { color: '#448aff' }, grid: { color: '#333' } }, yGas: { type: 'linear', position: 'right', ticks: { color: '#ffc400' }, grid: { display: false } } } } });
+        // --- INIZIALIZZAZIONE 4 GRAFICI SEPARATI (REFACTORING) ---
+        // Funzione di utilità per creare i grafici dinamicamente mantenendo il codice pulito
+        function initSingleChart(canvasId, label, colorHex, bgColorRgba) {
+            return new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        borderColor: colorHex,
+                        backgroundColor: bgColorRgba,
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: {
+                        x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } },
+                        y: { type: 'linear', position: 'left', ticks: { color: colorHex }, grid: { color: '#333' } }
+                    }
+                }
+            });
+        }
 
-        function getTrendHTML(delta, threshold, invertColors = false) { if (delta > threshold) return invertColors ? '<span class="up" style="color:#00e676;">▲</span>' : '<span class="up">▲</span>'; if (delta < -threshold) return invertColors ? '<span class="down" style="color:#ff5252;">▼</span>' : '<span class="down">▼</span>'; return '<span class="stable">▶</span>'; }
+        // Creazione Istanze Grafici
+        const tempChart = initSingleChart('tempChart', 'Temperatura (°C)', '#ff5252', 'rgba(255, 82, 82, 0.1)');
+        const umidChart = initSingleChart('umidChart', 'Umidità (%)', '#448aff', 'rgba(68, 138, 255, 0.1)');
+        const pressChart = initSingleChart('pressChart', 'Pressione (hPa)', '#b2ff59', 'rgba(178, 255, 89, 0.1)');
+        const gasChart = initSingleChart('gasChart', 'Gas (Raw)', '#ffc400', 'rgba(255, 196, 0, 0.1)');
+
+
+        // CORREZIONE LOGICA FRECCETTE: Eliminata l'inversione, si usa la regola standard.
+        // Aumenta = Verde (up), Diminuisce = Rosso (down), Stabile = Grigio (stable)
+        function getTrendHTML(delta, threshold) { 
+            if (delta > threshold) return '<span class="up">▲</span>'; 
+            if (delta < -threshold) return '<span class="down">▼</span>'; 
+            return '<span class="stable">▶</span>'; 
+        }
+
         function calculateDewPoint(temp, humidity) { const a = 17.27, b = 237.7; const alpha = ((a * temp) / (b + temp)) + Math.log(humidity / 100.0); return (b * alpha) / (a - alpha); }
         function checkAlerts(temp, humidity, dewPoint, deltaPressione3h) { alertBox.className = "alert-banner"; alertBox.innerHTML = ""; if (deltaPressione3h <= -3.0) { alertBox.classList.add("alert-storm"); alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico. Rischio fenomeni violenti."; return; } if (temp <= 3.0 && dewPoint <= 0.0) { alertBox.classList.add("alert-ice"); alertBox.innerHTML = "❄️ ATTENZIONE GHIACCIO: Formazione brina al suolo."; return; } if ((temp - dewPoint) <= 1.5 && humidity >= 90.0) { alertBox.classList.add("alert-fog"); alertBox.innerHTML = "🌫️ RISCHIO NEBBIA: Visibilità ridotta."; return; } }
         function calculateForecast(deltaPressione3h) { if (Math.abs(deltaPressione3h) < 1.0) { return "Condizioni Costanti / Stabili ➖"; } if (deltaPressione3h >= 1.0) { if (deltaPressione3h >= 3.0) return "Forte Miglioramento / Vento 💨"; return "In Miglioramento 📈"; } if (deltaPressione3h <= -1.0) { if (deltaPressione3h <= -3.0) return "Forte Peggioramento / Instabilità ⛈️"; return "In Peggioramento 📉"; } return "Analisi in corso..."; }
@@ -432,7 +468,7 @@
                 const dataAttuale = records[records.length - 1];
                 
                 ultimaLetturaSensori = dataAttuale;
-                eseguiPredizioneIA(); // Appena arrivano i dati aggiorniamo anche il calcolo IA
+                eseguiPredizioneIA(); 
                 
                 const dewPoint = calculateDewPoint(dataAttuale.temperatura, dataAttuale.umidita);
                 document.getElementById('val-dew').innerText = dewPoint.toFixed(1);
@@ -458,7 +494,8 @@
 
                     document.getElementById('trend-temp').innerHTML = getTrendHTML(deltaT, 0.2);
                     document.getElementById('trend-umid').innerHTML = getTrendHTML(deltaH, 1.0);
-                    document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5, true); 
+                    // Rimosso l'inversione colore per pressione per seguire la regola universale
+                    document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5); 
                     document.getElementById('trend-gas').innerHTML = getTrendHTML(deltaG, 20);
 
                     const previsione = calculateForecast(deltaP);
@@ -477,8 +514,22 @@
                         tempData.push(rec.temperatura); pressData.push(rec.pressione); umidData.push(rec.umidita); gasData.push(rec.gas_raw);
                     });
 
-                    weatherChart.data.labels = labels; weatherChart.data.datasets[0].data = tempData; weatherChart.data.datasets[1].data = pressData; weatherChart.update();
-                    hygroGasChart.data.labels = labels; hygroGasChart.data.datasets[0].data = umidData; hygroGasChart.data.datasets[1].data = gasData; hygroGasChart.update();
+                    // FUNZIONE MATEMATICA: Media Mobile Semplice (Filtro Passa-Basso)
+                    // Applicata ai dati del Gas per eliminare l'errore di quantizzazione dell'ADC a gradini
+                    // e ricostruire la curva continua di diffusione fluida reale nel tempo.
+                    const windowSize = 5; // Smussamento basato sugli ultimi 5 campioni
+                    const smoothedGasData = gasData.map((val, idx, arr) => {
+                        const start = Math.max(0, idx - windowSize + 1);
+                        const subset = arr.slice(start, idx + 1);
+                        const sum = subset.reduce((a, b) => a + b, 0);
+                        return sum / subset.length;
+                    });
+
+                    // Aggiornamento dei 4 grafici separati (Gas utilizza i dati smussati)
+                    tempChart.data.labels = labels; tempChart.data.datasets[0].data = tempData; tempChart.update();
+                    umidChart.data.labels = labels; umidChart.data.datasets[0].data = umidData; umidChart.update();
+                    pressChart.data.labels = labels; pressChart.data.datasets[0].data = pressData; pressChart.update();
+                    gasChart.data.labels = labels; gasChart.data.datasets[0].data = smoothedGasData; gasChart.update();
 
                     const max24 = Math.max(...last24h.map(r => r.temperatura)); const min24 = Math.min(...last24h.map(r => r.temperatura));
                     const maxU24 = Math.max(...last24h.map(r => r.umidita)); const minU24 = Math.min(...last24h.map(r => r.umidita));
@@ -498,7 +549,8 @@
                         
                         document.getElementById('trend-max').innerHTML = getTrendHTML(max24 - maxPrev, 0.2); document.getElementById('trend-min').innerHTML = getTrendHTML(min24 - minPrev, 0.2);
                         document.getElementById('trend-umax').innerHTML = getTrendHTML(maxU24 - maxUPrev, 1.0); document.getElementById('trend-umin').innerHTML = getTrendHTML(minU24 - minUPrev, 1.0);
-                        document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5, true); document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5, true);
+                        // Rimosso l'inversione colore per pressione per seguire la regola universale
+                        document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5); document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5);
                         document.getElementById('trend-gmax').innerHTML = getTrendHTML(maxG24 - maxGPrev, 20); document.getElementById('trend-gmin').innerHTML = getTrendHTML(minG24 - minGPrev, 20);
                     }
                 }
