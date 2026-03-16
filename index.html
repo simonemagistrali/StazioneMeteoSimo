@@ -72,7 +72,6 @@
         }
         .pca-section-title { font-size: 1.3em; font-weight: bold; margin-top: 15px; margin-bottom: 10px; color: #448aff; border-bottom: 1px solid #333; padding-bottom: 5px;}
         
-        /* CORREZIONE: Errore di battitura sull'altezza corretto, aggiunta altezza minima garantita */
         .pca-chart-container { 
             position: relative; 
             width: 100%; 
@@ -186,7 +185,7 @@
         </div>
     </div>
 
-    <!-- NUOVO OVERLAY POPUP PER ENTRAMBE LE PCA -->
+    <!-- OVERLAY POPUP PER TUTTE LE PCA -->
     <div class="ai-modal-overlay" id="pca-modal">
         <div class="pca-modal-content">
             <div class="ai-modal-title" style="color: #fff;">Confronto Analisi PCA 🔬</div>
@@ -216,6 +215,34 @@
                 <div id="pca-math-content2" class="pca-math">Calcolo matematico in corso...</div>
             </div>
 
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 3: Spazio Temporale (16 Dimensioni) -->
+            <div class="pca-section-title" style="color: #ffc400;">Test 3: Spazio Termodinamico Temporale (16 Dimensioni)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">Questa analisi calcola gli autovettori su 16 assi simultanei: include i valori istantanei e la loro traiettoria cinematica (Delta, Anomalia, Pendenza).</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart3"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details3">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content3" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 4: Spazio Assoluto (20 Dimensioni) -->
+            <div class="pca-section-title" style="color: #e040fb;">Test 4: Spazio Termo-Temporale Assoluto (20 Dimensioni)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">L'analisi definitiva: unisce la cinematica atmosferica (16D) al ciclo astronomico orbitale (4D). Rappresenta lo stato assoluto del sistema.</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart4"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details4">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content4" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
             <div class="pca-close-wrapper">
                 <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('pca-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Analisi</button>
             </div>
@@ -235,7 +262,7 @@
 
     <!-- Box Predizione AI Real-Time -->
     <div class="forecast-box" style="border-color: #00e676; position: relative;">
-        <div class="forecast-title" style="color: #00e676;">Meteo attuale previsto (Machine Learning)</div>
+        <div class="forecast-title" style="color: #00e676;">Meteo attuale previsto</div>
         <div class="forecast-text" id="ai-prediction-output">Addestramento in corso... (Richiede Dati)</div>
         <div id="ai-prediction-details" style="font-size: 0.8em; color: #888; margin-top: 5px; margin-bottom: 10px;"></div>
         
@@ -319,7 +346,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const auth = getAuth(app); // INIZIALIZZA AUTH
+        const auth = getAuth(app);
         
         const storicoRef = query(ref(db, 'MeteoStorico'), orderByChild('timestamp'), limitToLast(576));
         const datasetIARef = query(ref(db, 'DatasetIA')); 
@@ -330,8 +357,12 @@
         // --- MEMORIA GLOBALE ---
         let ultimaLetturaSensori = null;
         let archivioDatasetIA = []; 
-        let pcaChartInstance1 = null; // Riferimento al grafico PCA 1
-        let pcaChartInstance2 = null; // Riferimento al grafico PCA 2
+        let storicoRecente = []; // Memorizza in RAM locale le ultime 48h scaricate da Firebase
+        
+        let pcaChartInstance1 = null; 
+        let pcaChartInstance2 = null; 
+        let pcaChartInstance3 = null; 
+        let pcaChartInstance4 = null; // NUOVA INSTANZA PCA 20D
         
         const modalAI = document.getElementById('ai-modal');
         const modalPCA = document.getElementById('pca-modal');
@@ -367,25 +398,72 @@
             modalAI.style.display = 'flex';
         }
 
+        // ============================================================================
+        // === MOTORE MATEMATICO TEMPORALE (FEATURE ENGINEERING) ===
+        // ============================================================================
+        function calcolaFeatureTemporali(storico, timestampRiferimento, campo) {
+            const tempoInizio = timestampRiferimento - 10800; // 3 ore fa
+            const finestra = storico.filter(r => r.timestamp >= tempoInizio && r.timestamp <= timestampRiferimento);
+
+            if (finestra.length < 2) return { delta: 0, diff_media: 0, pendenza: 0 };
+
+            const valoriY = finestra.map(r => r[campo]);
+            const valoriX = finestra.map(r => (r.timestamp - tempoInizio) / 3600); // asse X in ore
+
+            const mediaY = valoriY.reduce((a, b) => a + b, 0) / valoriY.length;
+            const mediaX = valoriX.reduce((a, b) => a + b, 0) / valoriX.length;
+            
+            const valoreAttuale = valoriY[valoriY.length - 1];
+            const diffMedia = valoreAttuale - mediaY;
+            const delta = valoreAttuale - valoriY[0];
+
+            let num = 0, den = 0;
+            for (let i = 0; i < finestra.length; i++) {
+                num += (valoriX[i] - mediaX) * (valoriY[i] - mediaY);
+                den += Math.pow(valoriX[i] - mediaX, 2);
+            }
+            const pendenza = (den === 0) ? 0 : (num / den);
+
+            return { 
+                delta: Number(delta.toFixed(3)), 
+                diff_media: Number(diffMedia.toFixed(3)), 
+                pendenza: Number(pendenza.toFixed(3)) 
+            };
+        }
+
+        // --- SALVATAGGIO A 16 DIMENSIONI ---
         window.salvaDatasetIA = function(scenario) {
-            if (!ultimaLetturaSensori) { 
-                showToast("Attendi l'arrivo dei dati in tempo reale!"); 
+            if (!ultimaLetturaSensori || storicoRecente.length === 0) { 
+                showToast("Attendi l'arrivo dei dati storici e in tempo reale prima di salvare!"); 
                 return; 
             }
 
+            const tsAttuale = Math.floor(Date.now() / 1000);
+
+            const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+            const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+            const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+            const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
             const datasetRecord = {
                 etichetta: scenario,
+                timestamp: tsAttuale,
+                
                 temperatura: ultimaLetturaSensori.temperatura,
                 umidita: ultimaLetturaSensori.umidita,
                 pressione: ultimaLetturaSensori.pressione,
                 gas_raw: ultimaLetturaSensori.gas_raw,
-                timestamp: Math.floor(Date.now() / 1000)
+
+                t_delta3h: featT.delta, t_diff_media3h: featT.diff_media, t_pendenza3h: featT.pendenza,
+                u_delta3h: featU.delta, u_diff_media3h: featU.diff_media, u_pendenza3h: featU.pendenza,
+                p_delta3h: featP.delta, p_diff_media3h: featP.diff_media, p_pendenza3h: featP.pendenza,
+                g_delta3h: featG.delta, g_diff_media3h: featG.diff_media, g_pendenza3h: featG.pendenza
             };
 
             push(ref(db, 'DatasetIA'), datasetRecord)
                 .then(() => { 
                     window.chiudiModalTemporaneamente('ai-modal'); 
-                    showToast("Dati salvati! L'IA è stata aggiornata.", true);
+                    showToast("Dati salvati (16D)! L'IA è stata aggiornata.", true);
                 })
                 .catch((error) => { 
                     console.error(error); 
@@ -407,39 +485,68 @@
             eseguiPredizioneIA(); 
         });
 
-        // --- ALGORITMO MACHINE LEARNING (k-NN) ---
+        // --- ALGORITMO MACHINE LEARNING (k-NN a 16 DIMENSIONI) ---
         function eseguiPredizioneIA() {
-            if (!ultimaLetturaSensori) return;
             const outEl = document.getElementById('ai-prediction-output');
             const detEl = document.getElementById('ai-prediction-details');
 
-            if (archivioDatasetIA.length < 3) {
+            if (!ultimaLetturaSensori || storicoRecente.length === 0) return;
+
+            // Se il database non è stato ancora migrato a 16D, ferma tutto
+            if (archivioDatasetIA.length < 3 || archivioDatasetIA[0].t_delta3h === undefined) {
                 outEl.innerHTML = `Addestramento in corso... (${archivioDatasetIA.length}/3 minimi)`;
-                detEl.innerHTML = "L'algoritmo ha bisogno di più esempi umani per iniziare a dedurre.";
+                detEl.innerHTML = "L'algoritmo richiede dati storici a 16D (esegui la migrazione).";
                 return;
             }
 
             const k = Math.min(5, archivioDatasetIA.length);
-            let minT = Infinity, maxT = -Infinity, minH = Infinity, maxH = -Infinity;
-            let minP = Infinity, maxP = -Infinity, minG = Infinity, maxG = -Infinity;
+            const tsAttuale = Math.floor(Date.now() / 1000);
 
-            [...archivioDatasetIA, ultimaLetturaSensori].forEach(r => {
-                if (r.temperatura < minT) minT = r.temperatura; if (r.temperatura > maxT) maxT = r.temperatura;
-                if (r.umidita < minH) minH = r.umidita; if (r.umidita > maxH) maxH = r.umidita;
-                if (r.pressione < minP) minP = r.pressione; if (r.pressione > maxP) maxP = r.pressione;
-                if (r.gas_raw < minG) minG = r.gas_raw; if (r.gas_raw > maxG) maxG = r.gas_raw;
+            // 1. Calcolo della cinematica ATTUALE (le 16 dimensioni di "questo istante")
+            const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+            const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+            const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+            const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
+            const attuale16D = {
+                T_ist: ultimaLetturaSensori.temperatura, T_dlt: featT.delta, T_anm: featT.diff_media, T_pnd: featT.pendenza,
+                U_ist: ultimaLetturaSensori.umidita, U_dlt: featU.delta, U_anm: featU.diff_media, U_pnd: featU.pendenza,
+                P_ist: ultimaLetturaSensori.pressione, P_dlt: featP.delta, P_anm: featP.diff_media, P_pnd: featP.pendenza,
+                G_ist: ultimaLetturaSensori.gas_raw, G_dlt: featG.delta, G_anm: featG.diff_media, G_pnd: featG.pendenza
+            };
+
+            // 2. Estrazione di Minimi e Massimi per Normalizzazione
+            let mins = { T_ist: Infinity, T_dlt: Infinity, T_anm: Infinity, T_pnd: Infinity, U_ist: Infinity, U_dlt: Infinity, U_anm: Infinity, U_pnd: Infinity, P_ist: Infinity, P_dlt: Infinity, P_anm: Infinity, P_pnd: Infinity, G_ist: Infinity, G_dlt: Infinity, G_anm: Infinity, G_pnd: Infinity };
+            let maxs = { T_ist: -Infinity, T_dlt: -Infinity, T_anm: -Infinity, T_pnd: -Infinity, U_ist: -Infinity, U_dlt: -Infinity, U_anm: -Infinity, U_pnd: -Infinity, P_ist: -Infinity, P_dlt: -Infinity, P_anm: -Infinity, P_pnd: -Infinity, G_ist: -Infinity, G_dlt: -Infinity, G_anm: -Infinity, G_pnd: -Infinity };
+
+            const datasetStandardizzato = archivioDatasetIA.map(r => ({
+                etichetta: r.etichetta,
+                T_ist: r.temperatura, T_dlt: r.t_delta3h, T_anm: r.t_diff_media3h, T_pnd: r.t_pendenza3h,
+                U_ist: r.umidita, U_dlt: r.u_delta3h, U_anm: r.u_diff_media3h, U_pnd: r.u_pendenza3h,
+                P_ist: r.pressione, P_dlt: r.p_delta3h, P_anm: r.p_diff_media3h, P_pnd: r.p_pendenza3h,
+                G_ist: r.gas_raw, G_dlt: r.g_delta3h, G_anm: r.g_diff_media3h, G_pnd: r.g_pendenza3h
+            }));
+
+            [...datasetStandardizzato, attuale16D].forEach(r => {
+                for (let key in mins) {
+                    if (r[key] < mins[key]) mins[key] = r[key];
+                    if (r[key] > maxs[key]) maxs[key] = r[key];
+                }
             });
 
             const normalize = (val, min, max) => (max === min) ? 0 : (val - min) / (max - min);
 
-            const distanze = archivioDatasetIA.map(record => {
-                const dT = normalize(ultimaLetturaSensori.temperatura, minT, maxT) - normalize(record.temperatura, minT, maxT);
-                const dH = normalize(ultimaLetturaSensori.umidita, minH, maxH) - normalize(record.umidita, minH, maxH);
-                const dP = normalize(ultimaLetturaSensori.pressione, minP, maxP) - normalize(record.pressione, minP, maxP);
-                const dG = normalize(ultimaLetturaSensori.gas_raw, minG, maxG) - normalize(record.gas_raw, minG, maxG);
-                return { etichetta: record.etichetta, distanza: Math.sqrt(dT*dT + dH*dH + dP*dP + dG*dG) };
+            // 3. Calcolo Distanza Euclidea in un Iperspazio a 16 Dimensioni
+            const distanze = datasetStandardizzato.map(record => {
+                let sommaQuadrati = 0;
+                for (let key in mins) {
+                    let diff = normalize(attuale16D[key], mins[key], maxs[key]) - normalize(record[key], mins[key], maxs[key]);
+                    sommaQuadrati += diff * diff;
+                }
+                return { etichetta: record.etichetta, distanza: Math.sqrt(sommaQuadrati) };
             });
 
+            // 4. Scelta dei K più vicini
             distanze.sort((a, b) => a.distanza - b.distanza);
             const kNearest = distanze.slice(0, k);
             const conteggio = {};
@@ -456,7 +563,7 @@
 
             const icone = { "Sole_Sereno": "☀️ Sole/Sereno", "Nuvoloso": "☁️ Nuvoloso", "Pioggia": "🌧️ Pioggia", "Neve": "❄️ Neve" };
             outEl.innerHTML = `${icone[bestLabel]} (${Math.round((maxCount / k) * 100)}%)`;
-            detEl.innerHTML = `Affidabilità: calcolata sui ${k} scenari passati più simili. <br> Distribuzione: ${probStats.join(' | ')}`;
+            detEl.innerHTML = `Affidabilità: calcolata matematicamente su <b>16 dimensioni spaziali/temporali</b>.<br> Distribuzione K-NN: ${probStats.join(' | ')}`;
         }
 
         // ============================================================================
@@ -543,7 +650,6 @@
             return { eigenvalues: eigenvalues.map(e => e.val), eigenvectors: sortedEigenvectors };
         }
 
-        // Funzione di utilità per calcolare il giorno dell'anno
         function getDayOfYear(date) {
             const start = new Date(date.getFullYear(), 0, 0);
             const diff = date - start;
@@ -551,9 +657,7 @@
             return Math.floor(diff / oneDay);
         }
 
-        // MOTORE DI CALCOLO E RENDERING PCA MODULARE (Con Proiezione Dato Attuale)
         function eseguiEPlottaPCA(features, rawData, labels, canvasId, textContentId, existingChartInstance, currentRawData) {
-            // 1. Standardizzazione dello Storico
             let means = [], stdDevs = [];
             for (let j = 0; j < features.length; j++) {
                 let col = rawData.map(row => row[j]);
@@ -562,15 +666,12 @@
             }
             let zData = rawData.map(row => row.map((val, j) => (val - means[j]) / stdDevs[j]));
 
-            // 2. Covarianza e Autovettori sullo Storico
             let covMatrix = getCovarianceMatrix(zData);
             let eigenData = jacobiEigenSolver(covMatrix);
             
-            // 3. Varianza Spiegata
             let totalVariance = eigenData.eigenvalues.reduce((a, b) => a + b, 0);
             let varExplained = eigenData.eigenvalues.map(val => (val / totalVariance) * 100);
 
-            // 4. Proiezione Dati Storici su PC1 e PC2
             let projectedData = [];
             for (let i = 0; i < zData.length; i++) {
                 let pc1 = 0, pc2 = 0;
@@ -581,12 +682,9 @@
                 projectedData.push({ x: pc1, y: pc2, label: labels[i] });
             }
 
-            // 5. Proiezione del DATO ATTUALE (Se presente)
             let currentPc1 = 0, currentPc2 = 0;
-            let currentZScores = []; // Salviamo gli Z-score attuali per mostrarli a video
+            let currentZScores = []; 
             if (currentRawData) {
-                // SCIENTIFICAMENTE CORRETTO: Standardizziamo il dato attuale 
-                // usando la media e varianza dello storico, poi proiettiamo.
                 for (let j = 0; j < features.length; j++) {
                     let zValCurr = (currentRawData[j] - means[j]) / stdDevs[j];
                     currentZScores.push(zValCurr);
@@ -595,19 +693,17 @@
                 }
             }
 
-            // 6. Generazione Testo Scientifico
             let mathHTML = "";
             for(let i=0; i<2; i++) {
                 let eq = [];
                 let eqAttuale = [];
                 for(let j=0; j<features.length; j++) {
                     let weight = eigenData.eigenvectors[i][j];
-                    let featureName = features[j].toUpperCase();
+                    let featureName = features[j];
                     eq.push(`<span style="display:inline-block; width:120px; text-align:right;">${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${featureName}</span>`);
                     
                     if (currentRawData) {
                         let zScore = currentZScores[j];
-                        // Tooltip aggiunto per mostrare a quale grandezza si riferisce il numero se ci passi sopra col mouse
                         eqAttuale.push(`<span style="display:inline-block; width:120px; text-align:right;" title="${featureName}">(${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${zScore >= 0 ? '+' : ''}${zScore.toFixed(2)})</span>`);
                     }
                 }
@@ -627,7 +723,6 @@
 
             document.getElementById(textContentId).innerHTML = mathHTML;
 
-            // 7. Plottaggio Scatter
             const ctx = document.getElementById(canvasId).getContext('2d');
             
             const datasets = [
@@ -654,7 +749,6 @@
                 pointHoverRadius: 8
             }));
 
-            // Aggiungiamo il pallino attuale come dataset indipendente, più grande e visibile
             if (currentRawData) {
                 activeDatasets.push({
                     label: '🟢 SITUAZIONE ATTUALE',
@@ -687,39 +781,32 @@
             });
         }
 
-        // Gestore UI Principale
         window.apriModalPCA = function() {
             if (archivioDatasetIA.length < 5) {
                 showToast("Dati insufficienti per la PCA. Servono almeno 5 etichette nel Dataset.");
                 return;
             }
 
-            // CORREZIONE BUG RENDERING: 
-            // Mostriamo il modale PRIMA di calcolare e renderizzare i grafici.
             modalPCA.style.display = 'flex';
 
             let labels = archivioDatasetIA.map(row => row.etichetta);
 
-            // --- TEST 1: PCA SOLO FISICA (4 Dimensioni) ---
+            // PCA 1
             const features1 = ["Temp", "Umid", "Press", "Gas"];
             let rawData1 = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
             let currentRawData1 = ultimaLetturaSensori ? [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw] : null;
-            
             pcaChartInstance1 = eseguiEPlottaPCA(features1, rawData1, labels, 'pcaChart1', 'pca-math-content1', pcaChartInstance1, currentRawData1);
 
-            // --- TEST 2: PCA FISICA + TEMPO CICLICO (8 Dimensioni) ---
+            // PCA 2
             const features2 = ["Temp", "Umid", "Press", "Gas", "Min_Sin", "Min_Cos", "Day_Sin", "Day_Cos"];
             let rawData2 = archivioDatasetIA.map(row => {
                 let d = new Date(row.timestamp * 1000);
                 let minuti_giornata = (d.getHours() * 60) + d.getMinutes();
                 let giorno_anno = getDayOfYear(d);
-
-                // Trasformazione Trigonometrica
                 let min_sin = Math.sin(2 * Math.PI * minuti_giornata / 1440);
                 let min_cos = Math.cos(2 * Math.PI * minuti_giornata / 1440);
                 let day_sin = Math.sin(2 * Math.PI * giorno_anno / 365.25);
                 let day_cos = Math.cos(2 * Math.PI * giorno_anno / 365.25);
-
                 return [row.temperatura, row.umidita, row.pressione, row.gas_raw, min_sin, min_cos, day_sin, day_cos];
             });
 
@@ -728,20 +815,96 @@
                 let d_curr = new Date(ultimaLetturaSensori.timestamp * 1000);
                 let min_curr = (d_curr.getHours() * 60) + d_curr.getMinutes();
                 let day_curr = getDayOfYear(d_curr);
-                
                 let min_sin_curr = Math.sin(2 * Math.PI * min_curr / 1440);
                 let min_cos_curr = Math.cos(2 * Math.PI * min_curr / 1440);
                 let day_sin_curr = Math.sin(2 * Math.PI * day_curr / 365.25);
                 let day_cos_curr = Math.cos(2 * Math.PI * day_curr / 365.25);
-
                 currentRawData2 = [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw, min_sin_curr, min_cos_curr, day_sin_curr, day_cos_curr];
             }
-
             pcaChartInstance2 = eseguiEPlottaPCA(features2, rawData2, labels, 'pcaChart2', 'pca-math-content2', pcaChartInstance2, currentRawData2);
+
+            // PCA 3: SPAZIO TERMODINAMICO TEMPORALE (16 DIMENSIONI)
+            if (archivioDatasetIA[0] && archivioDatasetIA[0].t_delta3h === undefined) {
+                document.getElementById('pca-math-content3').innerHTML = "<span style='color:#ff5252;'>Errore: i dati nel database non contengono le 16 dimensioni. Esegui lo script di migrazione.</span>";
+                document.getElementById('pca-math-content4').innerHTML = "<span style='color:#ff5252;'>Impossibile generare la PCA 4 senza i dati cinematici.</span>";
+            } else {
+                const features3 = [
+                    "T_Ist", "T_Dlt", "T_Anm", "T_Pnd",
+                    "U_Ist", "U_Dlt", "U_Anm", "U_Pnd",
+                    "P_Ist", "P_Dlt", "P_Anm", "P_Pnd",
+                    "G_Ist", "G_Dlt", "G_Anm", "G_Pnd"
+                ];
+
+                let rawData3 = archivioDatasetIA.map(row => [
+                    row.temperatura, row.t_delta3h, row.t_diff_media3h, row.t_pendenza3h,
+                    row.umidita, row.u_delta3h, row.u_diff_media3h, row.u_pendenza3h,
+                    row.pressione, row.p_delta3h, row.p_diff_media3h, row.p_pendenza3h,
+                    row.gas_raw, row.g_delta3h, row.g_diff_media3h, row.g_pendenza3h
+                ]);
+
+                let currentRawData3 = null;
+                if (ultimaLetturaSensori && storicoRecente.length > 0) {
+                    const tsAttuale = Math.floor(Date.now() / 1000);
+                    const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+                    const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+                    const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+                    const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
+                    currentRawData3 = [
+                        ultimaLetturaSensori.temperatura, featT.delta, featT.diff_media, featT.pendenza,
+                        ultimaLetturaSensori.umidita, featU.delta, featU.diff_media, featU.pendenza,
+                        ultimaLetturaSensori.pressione, featP.delta, featP.diff_media, featP.pendenza,
+                        ultimaLetturaSensori.gas_raw, featG.delta, featG.diff_media, featG.pendenza
+                    ];
+                }
+
+                pcaChartInstance3 = eseguiEPlottaPCA(features3, rawData3, labels, 'pcaChart3', 'pca-math-content3', pcaChartInstance3, currentRawData3);
+
+                // --- PCA 4: SPAZIO ASSOLUTO (20 DIMENSIONI) ---
+                const features4 = [
+                    "T_Ist", "T_Dlt", "T_Anm", "T_Pnd",
+                    "U_Ist", "U_Dlt", "U_Anm", "U_Pnd",
+                    "P_Ist", "P_Dlt", "P_Anm", "P_Pnd",
+                    "G_Ist", "G_Dlt", "G_Anm", "G_Pnd",
+                    "Min_S", "Min_C", "Day_S", "Day_C"
+                ];
+
+                let rawData4 = archivioDatasetIA.map(row => {
+                    let d = new Date(row.timestamp * 1000);
+                    let minuti_giornata = (d.getHours() * 60) + d.getMinutes();
+                    let giorno_anno = getDayOfYear(d);
+                    let min_sin = Math.sin(2 * Math.PI * minuti_giornata / 1440);
+                    let min_cos = Math.cos(2 * Math.PI * minuti_giornata / 1440);
+                    let day_sin = Math.sin(2 * Math.PI * giorno_anno / 365.25);
+                    let day_cos = Math.cos(2 * Math.PI * giorno_anno / 365.25);
+
+                    return [
+                        row.temperatura, row.t_delta3h, row.t_diff_media3h, row.t_pendenza3h,
+                        row.umidita, row.u_delta3h, row.u_diff_media3h, row.u_pendenza3h,
+                        row.pressione, row.p_delta3h, row.p_diff_media3h, row.p_pendenza3h,
+                        row.gas_raw, row.g_delta3h, row.g_diff_media3h, row.g_pendenza3h,
+                        min_sin, min_cos, day_sin, day_cos
+                    ];
+                });
+
+                let currentRawData4 = null;
+                if (currentRawData3 && ultimaLetturaSensori) {
+                    let d_curr = new Date(ultimaLetturaSensori.timestamp * 1000);
+                    let min_curr = (d_curr.getHours() * 60) + d_curr.getMinutes();
+                    let day_curr = getDayOfYear(d_curr);
+                    let min_sin_curr = Math.sin(2 * Math.PI * min_curr / 1440);
+                    let min_cos_curr = Math.cos(2 * Math.PI * min_curr / 1440);
+                    let day_sin_curr = Math.sin(2 * Math.PI * day_curr / 365.25);
+                    let day_cos_curr = Math.cos(2 * Math.PI * day_curr / 365.25);
+
+                    // Espandiamo le 16 dimensioni attuali aggiungendo le 4 coordinate temporali
+                    currentRawData4 = [...currentRawData3, min_sin_curr, min_cos_curr, day_sin_curr, day_cos_curr];
+                }
+
+                pcaChartInstance4 = eseguiEPlottaPCA(features4, rawData4, labels, 'pcaChart4', 'pca-math-content4', pcaChartInstance4, currentRawData4);
+            }
         }
 
-
-        // --- INIZIALIZZAZIONE 4 GRAFICI SEPARATI (STANDARD) ---
         function initSingleChart(canvasId, label, colorHex, bgColorRgba) {
             return new Chart(document.getElementById(canvasId).getContext('2d'), {
                 type: 'line',
@@ -775,8 +938,9 @@
             snapshot.forEach((child) => { records.push(child.val()); });
 
             if (records.length > 0) {
+                storicoRecente = records;
+
                 const dataAttuale = records[records.length - 1];
-                
                 ultimaLetturaSensori = dataAttuale;
                 eseguiPredizioneIA(); 
                 
@@ -859,9 +1023,8 @@
                 }
             }
         });
-    }) // <-- CHIUSURA DEL BLOCCO DI LOGIN POSITIVO
+    }) 
         .catch((error) => {
-            // Gestione oggettiva dell'errore se le credenziali sono sbagliate
             console.error("Errore di autenticazione:", error.code, error.message);
             document.getElementById('last-update').innerText = "Errore di accesso al DB: " + error.message;
         });
