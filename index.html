@@ -305,6 +305,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, query, orderByChild, limitToLast, onValue, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAobl_IquxYnuUL2Y0rgFf3tRIyyrhpG48",
@@ -318,6 +319,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app); // INIZIALIZZA AUTH
         
         const storicoRef = query(ref(db, 'MeteoStorico'), orderByChild('timestamp'), limitToLast(576));
         const datasetIARef = query(ref(db, 'DatasetIA')); 
@@ -391,6 +393,10 @@
                 });
         }
         setTimeout(controllaTimerPopup, 3000);
+
+        signInWithEmailAndPassword(auth, "simone.magistrali@gmail.com", "Asdf.0987")
+        .then((userCredential) => {
+            console.log("[OK] Autenticazione web riuscita con successo.");
 
         // --- LETTURA DATASET IA ---
         onValue(datasetIARef, (snapshot) => {
@@ -852,6 +858,12 @@
                     }
                 }
             }
+        });
+    }) // <-- CHIUSURA DEL BLOCCO DI LOGIN POSITIVO
+        .catch((error) => {
+            // Gestione oggettiva dell'errore se le credenziali sono sbagliate
+            console.error("Errore di autenticazione:", error.code, error.message);
+            document.getElementById('last-update').innerText = "Errore di accesso al DB: " + error.message;
         });
     </script>
 </body>
