@@ -291,6 +291,57 @@
         </div>
     </div>
 
+    <!-- OVERLAY POPUP PER LE FORMULE MATEMATICHE -->
+    <div class="ai-modal-overlay" id="formule-modal">
+        <div class="pca-modal-content" style="max-width: 800px;">
+            <div class="ai-modal-title" style="color: #e040fb;">Il Cuore Matematico 🧮</div>
+            <div class="ai-modal-desc">Di seguito sono riportate le principali formule scientifiche e gli algoritmi utilizzati in tempo reale da questa stazione meteo.</div>
+            
+            <div class="pca-section-title">1. Derivata Temporale (Pendenza)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">La pendenza della curva (es. variazione di temperatura nelle ultime 3 ore) viene calcolata tramite regressione lineare semplice per minimizzare l'errore quadratico:</p>
+                <div class="pca-math">
+                    m = Σ [ (x_i - x̄) · (y_i - ȳ) ] / Σ (x_i - x̄)²
+                </div>
+                <p style="margin-bottom:0;">Dove <b>x_i</b> è il tempo in ore, <b>y_i</b> è il valore del sensore, e <b>x̄, ȳ</b> sono le medie mobili calcolate sulla finestra temporale.</p>
+            </div>
+
+            <div class="pca-section-title">2. K-Nearest Neighbors (IA Previsionale)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">L'intelligenza artificiale classifica il meteo calcolando la distanza euclidea tra lo stato attuale e i dati storici in un iperspazio (fino a 20 dimensioni). Prima, ogni variabile viene normalizzata (Min-Max Scaling):</p>
+                <div class="pca-math">
+                    z_i = (x_i - min(x)) / (max(x) - min(x))
+                </div>
+                <p>Successivamente viene calcolata la distanza euclidea D tra lo stato attuale e i record storici:</p>
+                <div class="pca-math">
+                    D = √ [ Σ (z_attuale_i - z_storico_i)² ]
+                </div>
+                <p style="margin-bottom:0;">L'algoritmo seleziona i <b>K</b> punti con la distanza D minore e assegna la probabilità basata sulla frequenza delle etichette.</p>
+            </div>
+
+            <div class="pca-section-title">3. Principal Component Analysis (PCA)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">La PCA riduce le dimensioni mantenendo la massima varianza. I dati grezzi vengono standardizzati (Z-score):</p>
+                <div class="pca-math">
+                    Z = (X - μ) / σ
+                </div>
+                <p>Si calcola la matrice di covarianza (C):</p>
+                <div class="pca-math">
+                    C_ij = Σ (Z_ki · Z_kj) / (n - 1)
+                </div>
+                <p>Tramite l'algoritmo iterativo di Jacobi, si diagonalizza la matrice C per trovare gli Autovalori (λ) e gli Autovettori (V).</p>
+                <p>Infine, i dati attuali vengono proiettati sulle nuove componenti principali (PC1, PC2) tramite combinazione lineare:</p>
+                <div class="pca-math">
+                    PC_n = Σ (Z_i · V_in)
+                </div>
+            </div>
+
+            <div class="pca-close-wrapper">
+                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('formule-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Formule</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast-msg" class="toast"></div>
 
@@ -374,6 +425,21 @@
 
     <div class="timestamp" id="last-update">Ultimo aggiornamento: In attesa di connessione...</div>
 
+    <div style="text-align: center; margin-bottom: 50px;">
+        <style>
+            .btn-formule {
+                background-color: transparent; border: 1px solid #e040fb; color: #e040fb;
+                border-radius: 12px; font-size: 1.1em; cursor: pointer; margin-top: 20px; 
+                transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; 
+                padding: 15px 30px; font-weight: 600;
+            }
+            .btn-formule:hover { background-color: #e040fb; color: #121212; box-shadow: 0 0 20px rgba(224, 64, 251, 0.4); transform: translateY(-3px); }
+        </style>
+        <button class="btn-formule" onclick="apriModalFormule()">
+            🧮 Esplora le Formule Matematiche
+        </button>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, query, orderByChild, limitToLast, onValue, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -441,6 +507,10 @@
                 return; 
             }
             modalAI.style.display = 'flex';
+        }
+
+        window.apriModalFormule = function() {
+            document.getElementById('formule-modal').style.display = 'flex';
         }
 
         // ============================================================================
