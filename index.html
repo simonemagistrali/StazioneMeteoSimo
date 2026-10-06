@@ -292,7 +292,7 @@
         <div class="card temp">
             <div class="label">Temperatura Attuale</div>
             <div class="value"><span id="val-temp">--</span><span class="unit">°C</span><span class="trend" id="trend-temp"></span></div>
-            <span class="sub-label">Dew Point: <span id="val-dew">--</span>°C</span>
+            <span class="sub-label">Dew Point: <span id="val-dew">--</span>°C | Percepita: <span id="val-percepita">--</span>°C</span>
             <div class="min-max-box">
                 <div class="min-max-item">Min 24h<br><span id="val-min">--</span>°C <span class="trend-small" id="trend-min"></span></div>
                 <div class="min-max-item">Max 24h<br><span id="val-max">--</span>°C <span class="trend-small" id="trend-max"></span></div>
@@ -302,6 +302,7 @@
         <div class="card umid">
             <div class="label">Umidità Attuale</div>
             <div class="value"><span id="val-umid">--</span><span class="unit">%</span><span class="trend" id="trend-umid"></span></div>
+            <span class="sub-label">Assoluta: <span id="val-abs-umid">--</span> g/m³</span>
             <div class="min-max-box">
                 <div class="min-max-item">Min 24h<br><span id="val-umin">--</span>% <span class="trend-small" id="trend-umin"></span></div>
                 <div class="min-max-item">Max 24h<br><span id="val-umax">--</span>% <span class="trend-small" id="trend-umax"></span></div>
@@ -311,6 +312,7 @@
         <div class="card press">
             <div class="label">Pressione</div>
             <div class="value"><span id="val-press">--</span><span class="unit">hPa</span><span class="trend" id="trend-press"></span></div>
+            <span class="sub-label">Base Nubi: <span id="val-cloud-base">--</span> m</span>
             <div class="min-max-box">
                 <div class="min-max-item">Min 24h<br><span id="val-pmin">--</span> <span class="trend-small" id="trend-pmin"></span></div>
                 <div class="min-max-item">Max 24h<br><span id="val-pmax">--</span> <span class="trend-small" id="trend-pmax"></span></div>
@@ -320,6 +322,7 @@
         <div class="card gas">
             <div class="label">Qualità Aria (Raw)</div>
             <div class="value"><span id="val-gas">--</span><span class="unit">/1024</span><span class="trend" id="trend-gas"></span></div>
+            <span class="sub-label">AQI (Stima): <span id="val-aqi">--</span>%</span>
             <div class="min-max-box">
                 <div class="min-max-item">Min 24h (Migliore)<br><span id="val-gmin">--</span> <span class="trend-small" id="trend-gmin"></span></div>
                 <div class="min-max-item">Max 24h (Peggiore)<br><span id="val-gmax">--</span> <span class="trend-small" id="trend-gmax"></span></div>
@@ -937,6 +940,11 @@
         }
 
         function calculateDewPoint(temp, humidity) { const a = 17.27, b = 237.7; const alpha = ((a * temp) / (b + temp)) + Math.log(humidity / 100.0); return (b * alpha) / (a - alpha); }
+        function calculateApparentTemperature(temp, hum) { const e = (hum / 100) * 6.105 * Math.exp((17.27 * temp) / (237.7 + temp)); return temp + 0.33 * e - 4.00; }
+        function calculateAbsoluteHumidity(temp, hum) { return (6.112 * Math.exp((17.67 * temp)/(temp + 243.5)) * hum * 2.1674) / (273.15 + temp); }
+        function calculateCloudBase(temp, dewPoint) { const diff = temp - dewPoint; return diff < 0 ? 0 : diff * 125; }
+        function calculateAQI(gasRaw) { let aqi = 100 - ((gasRaw - 50) / (800 - 50) * 100); return Math.max(0, Math.min(100, aqi)); }
+
         function checkAlerts(temp, humidity, dewPoint, deltaPressione3h) { alertBox.className = "alert-banner"; alertBox.innerHTML = ""; if (deltaPressione3h <= -3.0) { alertBox.classList.add("alert-storm"); alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico. Rischio fenomeni violenti."; return; } if (temp <= 3.0 && dewPoint <= 0.0) { alertBox.classList.add("alert-ice"); alertBox.innerHTML = "❄️ ATTENZIONE GHIACCIO: Formazione brina al suolo."; return; } if ((temp - dewPoint) <= 1.5 && humidity >= 90.0) { alertBox.classList.add("alert-fog"); alertBox.innerHTML = "🌫️ RISCHIO NEBBIA: Visibilità ridotta."; return; } }
         function calculateForecast(deltaPressione3h) { if (Math.abs(deltaPressione3h) < 1.0) { return "Condizioni Costanti / Stabili ➖"; } if (deltaPressione3h >= 1.0) { if (deltaPressione3h >= 3.0) return "Forte Miglioramento / Vento 💨"; return "In Miglioramento 📈"; } if (deltaPressione3h <= -1.0) { if (deltaPressione3h <= -3.0) return "Forte Peggioramento / Instabilità ⛈️"; return "In Peggioramento 📉"; } return "Analisi in corso..."; }
 
@@ -960,11 +968,20 @@
                 eseguiPredizioneIA(); 
                 
                 const dewPoint = calculateDewPoint(dataAttuale.temperatura, dataAttuale.umidita);
+                const perceived = calculateApparentTemperature(dataAttuale.temperatura, dataAttuale.umidita);
+                const absHum = calculateAbsoluteHumidity(dataAttuale.temperatura, dataAttuale.umidita);
+                const cloudBase = calculateCloudBase(dataAttuale.temperatura, dewPoint);
+                const aqi = calculateAQI(dataAttuale.gas_raw);
+
                 document.getElementById('val-dew').innerText = dewPoint.toFixed(1);
+                document.getElementById('val-percepita').innerText = perceived.toFixed(1);
                 document.getElementById('val-temp').innerText = dataAttuale.temperatura.toFixed(1);
                 document.getElementById('val-umid').innerText = dataAttuale.umidita.toFixed(1);
+                document.getElementById('val-abs-umid').innerText = absHum.toFixed(1);
                 document.getElementById('val-press').innerText = dataAttuale.pressione.toFixed(1);
+                document.getElementById('val-cloud-base').innerText = Math.round(cloudBase);
                 document.getElementById('val-gas').innerText = dataAttuale.gas_raw;
+                document.getElementById('val-aqi').innerText = Math.round(aqi);
 
                 const date = new Date(dataAttuale.timestamp * 1000); 
                 document.getElementById('last-update').innerText = `Ultimo aggiornamento: ${date.toLocaleString('it-IT')}`;
