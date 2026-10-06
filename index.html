@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stazione Meteo Simo</title>
+    <!-- Importazione Chart.js per i grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS: Layout e Design */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #00e676; text-transform: uppercase; letter-spacing: 2px; text-align: center;}
+        
+        /* --- STILE PER IL POPUP AI E DATA LABELING --- */
+        .ai-modal-overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .ai-modal-content {
+            background-color: #2c2c2c; border: 2px solid #00e676; border-radius: 12px;
+            padding: 30px; text-align: center; max-width: 400px; width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 230, 118, 0.2);
+            position: relative;
+        }
+        .ai-modal-title { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; color: #fff;}
+        .ai-modal-desc { font-size: 0.95em; color: #ccc; margin-bottom: 25px; line-height: 1.4;}
+        .ai-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .ai-btn {
+            padding: 15px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold;
+            cursor: pointer; transition: transform 0.1s; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .ai-btn:active { transform: scale(0.95); }
+        .btn-sole { background-color: #fbc02d; color: #000; text-shadow: none;}
+        .btn-nuvole { background-color: #757575; }
+        .btn-pioggia { background-color: #1976d2; }
+        .btn-neve { background-color: #e0e0e0; color: #000; text-shadow: none;}
+        .ai-btn-close {
+            background-color: transparent; border: 1px solid #777; color: #aaa;
+            padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 10px;
+        }
+        .ai-btn-close:hover { background-color: #444; color: #fff; }
+
+        /* Pulsanti Box IA */
+        .btn-correct-ai, .btn-pca {
+            background-color: transparent; border-radius: 6px; font-size: 0.85em;
+            cursor: pointer; margin-top: 10px; transition: all 0.2s ease;
+            text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 15px; width: 100%; box-sizing: border-box;
+        }
+        .btn-correct-ai { border: 1px solid #00e676; color: #00e676; }
+        .btn-correct-ai:hover { background-color: #00e676; color: #121212; font-weight: bold; }
+        
+        .btn-pca { border: 1px solid #448aff; color: #448aff; margin-top: 10px;}
+        .btn-pca:hover { background-color: #448aff; color: #121212; font-weight: bold; }
+
+        /* --- STILE PER IL POPUP PCA --- */
+        .pca-modal-content {
+            background-color: #1e1e1e; border: 2px solid #448aff; border-radius: 12px;
+            padding: 20px; text-align: left; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(68, 138, 255, 0.2);
+            display: flex; flex-direction: column;
+        }
+        .pca-section-title { font-size: 1.3em; font-weight: bold; margin-top: 15px; margin-bottom: 10px; color: #448aff; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        
+        .pca-chart-container { 
+            position: relative; 
+            width: 100%; 
+            height: 450px; 
+            min-height: 450px; 
+            background-color: #2c2c2c; 
+            border-radius: 8px; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            margin-bottom: 15px;
+        }
+        
+        .pca-text-box { background-color: #2c2c2c; padding: 15px; border-radius: 8px; font-size: 0.85em; line-height: 1.5; color: #ddd; margin-bottom: 20px;}
+        .pca-text-box h3 { color: #aaa; margin-top: 0; margin-bottom: 10px; font-size: 1.1em;}
+        .pca-math { font-family: monospace; background: #121212; padding: 10px; border-radius: 5px; color: #00e676; overflow-x: auto; white-space: nowrap;}
+        .pca-close-wrapper { text-align: center; margin-top: 20px; position: sticky; bottom: 0; background-color: #1e1e1e; padding: 10px 0;}
+
+        /* Notifiche Toast */
+        .toast {
+            position: fixed; bottom: 20px; right: 20px;
+            background-color: #333; color: #fff;
+            padding: 12px 20px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transform: translateY(100px); opacity: 0;
+            transition: all 0.3s ease; z-index: 2000;
+            border-left: 4px solid #ff5252;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+
+        /* Box Previsioni, AI e Allarmi */
+        .forecast-box {
+            background-color: #2c2c2c; border: 2px solid #555; border-radius: 12px;
+            padding: 20px; width: 100%; max-width: 960px; text-align: center;
+            margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); box-sizing: border-box;
+        }
+        .forecast-title { font-size: 0.9em; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
+        .forecast-text { font-size: 1.8em; font-weight: bold; color: #fff; margin-top: 10px;}
+        
+        .alert-banner {
+            display: none; width: 100%; max-width: 960px; margin-top: 15px; padding: 15px;
+            border-radius: 8px; font-weight: bold; text-align: center; animation: pulse 2s infinite;
+            box-sizing: border-box;
+        }
+        .alert-ice { background-color: #0d47a1; color: #bbdefb; border: 2px solid #42a5f5; display: block; }
+        .alert-fog { background-color: #424242; color: #eeeeee; border: 2px solid #9e9e9e; display: block; }
+        .alert-storm { background-color: #b71c1c; color: #ffcdd2; border: 2px solid #ef5350; display: block; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+
+        /* Griglia Card Sensori */
+        .dashboard {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px; width: 100%; max-width: 1000px; margin-top: 20px;
+        }
+        .card {
+            background-color: #1e1e1e; border-radius: 12px; padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; border-top: 4px solid #333; position: relative;
+        }
+        .card.temp { border-top-color: #ff5252; }
+        .card.umid { border-top-color: #448aff; }
+        .card.press { border-top-color: #b2ff59; }
+        .card.gas { border-top-color: #ffc400; }
+        
+        .value { font-size: 2.8em; font-weight: bold; margin: 10px 0; }
+        .unit { font-size: 0.4em; color: #aaaaaa; }
+        .label { font-size: 1.2em; color: #bbbbbb; }
+        .sub-label { font-size: 0.8em; color: #888; margin-top: -10px; margin-bottom: 10px; display: block;}
+        
+        /* Modifica Architettura Grafici */
+        .charts-wrapper {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px; width: 100%; max-width: 1000px; margin-top: 25px;
+        }
+        .chart-container {
+            width: 100%; height: 280px; background-color: #1e1e1e; 
+            border-radius: 12px; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .trend { font-size: 0.4em; margin-left: 10px; vertical-align: middle; }
+        .trend-small { font-size: 0.8em; margin-left: 5px; }
+        
+        .min-max-box { margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; font-size: 0.9em; color: #ccc; display: flex; justify-content: space-around; }
+        .min-max-item span[id^="val-"] { font-weight: bold; color: #fff; }
+
+        span.up { color: #00e676 !important; }     
+        span.down { color: #ff5252 !important; }   
+        span.stable { color: #888888 !important; } 
+
+        .timestamp { margin-top: 30px; margin-bottom: 30px; color: #888888; font-size: 0.9em; text-align: center;}
+        .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-dot.connected { background-color: #00e676; }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY POPUP PER ADDESTRAMENTO IA -->
+    <div class="ai-modal-overlay" id="ai-modal">
+        <div class="ai-modal-content">
+            <div class="ai-modal-title">Oracolo🧠</div>
+            <div class="ai-modal-desc">Aiuta la Stazione Meteo Simo a creare il dataset per previsioni meteo. Se ti trovi in zona Besurica Piacenza seleziona la condizione meteo che osservi attualmente fuori.</div>
+            
+            <div class="ai-btn-grid">
+                <button class="ai-btn btn-sole" onclick="salvaDatasetIA('Sole_Sereno')">☀️ Sole/Sereno</button>
+                <button class="ai-btn btn-nuvole" onclick="salvaDatasetIA('Nuvoloso')">☁️ Nuvoloso</button>
+                <button class="ai-btn btn-pioggia" onclick="salvaDatasetIA('Pioggia')">🌧️ Pioggia</button>
+                <button class="ai-btn btn-neve" onclick="salvaDatasetIA('Neve')">❄️ Neve</button>
+            </div>
+            
+            <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('ai-modal')">Non ora / Chiudi</button>
+        </div>
+    </div>
+
+    <!-- OVERLAY POPUP PER TUTTE LE PCA -->
+    <div class="ai-modal-overlay" id="pca-modal">
+        <div class="pca-modal-content">
+            <div class="ai-modal-title" style="color: #fff;">Confronto Analisi PCA 🔬</div>
+            <div class="ai-modal-desc" style="margin-bottom: 5px;">Proiezione bidimensionale per studiare le influenze e la separazione dei dati meteo. Il pallino verde grande indica la situazione meteo <b>attuale</b>.</div>
+            
+            <!-- PCA 1: Solo Fisica -->
+            <div class="pca-section-title">Test 1: Solo Grandezze Fisiche (T, U, P, Gas)</div>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart1"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details1">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content1" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 2: Fisica + Tempo Ciclico -->
+            <div class="pca-section-title" style="color: #00e676;">Test 2: Grandezze Fisiche + Tempo (Trigonometrico)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">L'ora e il giorno sono stati aggiunti come coordinate circolari (Sen/Cos) per rispettarne la ciclicità reale.</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart2"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details2">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content2" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 3: Spazio Temporale (16 Dimensioni) -->
+            <div class="pca-section-title" style="color: #ffc400;">Test 3: Spazio Termodinamico Temporale (16 Dimensioni)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">Questa analisi calcola gli autovettori su 16 assi simultanei: include i valori istantanei e la loro traiettoria cinematica (Delta, Anomalia, Pendenza).</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart3"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details3">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content3" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
+            <!-- SEPARATORE VISIVO -->
+            <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)); margin: 10px 0;">
+
+            <!-- PCA 4: Spazio Assoluto (20 Dimensioni) -->
+            <div class="pca-section-title" style="color: #e040fb;">Test 4: Spazio Termo-Temporale Assoluto (20 Dimensioni)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">L'analisi definitiva: unisce la cinematica atmosferica (16D) al ciclo astronomico orbitale (4D). Rappresenta lo stato assoluto del sistema.</p>
+            <div class="pca-chart-container">
+                <canvas id="pcaChart4"></canvas>
+            </div>
+            <div class="pca-text-box" id="pca-details4">
+                <h3>Autovettori (Pesi delle Grandezze)</h3>
+                <div id="pca-math-content4" class="pca-math">Calcolo matematico in corso...</div>
+            </div>
+
+            <div class="pca-close-wrapper">
+                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('pca-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Analisi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-msg" class="toast"></div>
+
+    <h1><span class="status-dot" id="connection-status"></span>Stazione Meteo Simo</h1>
+
+    <!-- Box Algoritmo Previsionale WMO -->
+    <div class="forecast-box">
+        <div class="forecast-title">Tendenza Meteorologica (Standard WMO 3 Ore)</div>
+        <div class="forecast-text" id="forecast-output">Analisi dati in corso... (Richiede 3h di storico)</div>
+    </div>
+
+    <!-- Box Predizione AI Real-Time -->
+    <div class="forecast-box" style="border-color: #00e676; position: relative;">
+        <div class="forecast-title" style="color: #00e676;">Meteo attuale previsto</div>
+        <div class="forecast-text" id="ai-prediction-output">Addestramento in corso... (Richiede Dati)</div>
+        <div id="ai-prediction-details" style="font-size: 0.8em; color: #888; margin-top: 5px; margin-bottom: 10px;"></div>
+        
+        <div style="display: flex; gap: 10px; flex-direction: column; align-items: center; max-width: 400px; margin: 0 auto;">
+            <button class="btn-correct-ai" onclick="apriModalManualmente()">
+                La previsione è errata? Correggila
+            </button>
+            <button class="btn-pca" onclick="apriModalPCA()">
+                📊 Visualizza e Confronta Analisi PCA
+            </button>
+        </div>
+    </div>
+
+    <!-- Banner Allarmi Dinamico -->
+    <div id="alert-box" class="alert-banner"></div>
+
+    <!-- Dashboard Valori Sensori -->
+    <div class="dashboard">
+        <div class="card temp">
+            <div class="label">Temperatura Attuale</div>
+            <div class="value"><span id="val-temp">--</span><span class="unit">°C</span><span class="trend" id="trend-temp"></span></div>
+            <span class="sub-label">Dew Point: <span id="val-dew">--</span>°C</span>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-min">--</span>°C <span class="trend-small" id="trend-min"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-max">--</span>°C <span class="trend-small" id="trend-max"></span></div>
+            </div>
+        </div>
+
+        <div class="card umid">
+            <div class="label">Umidità Attuale</div>
+            <div class="value"><span id="val-umid">--</span><span class="unit">%</span><span class="trend" id="trend-umid"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-umin">--</span>% <span class="trend-small" id="trend-umin"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-umax">--</span>% <span class="trend-small" id="trend-umax"></span></div>
+            </div>
+        </div>
+
+        <div class="card press">
+            <div class="label">Pressione</div>
+            <div class="value"><span id="val-press">--</span><span class="unit">hPa</span><span class="trend" id="trend-press"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h<br><span id="val-pmin">--</span> <span class="trend-small" id="trend-pmin"></span></div>
+                <div class="min-max-item">Max 24h<br><span id="val-pmax">--</span> <span class="trend-small" id="trend-pmax"></span></div>
+            </div>
+        </div>
+
+        <div class="card gas">
+            <div class="label">Qualità Aria (Raw)</div>
+            <div class="value"><span id="val-gas">--</span><span class="unit">/1024</span><span class="trend" id="trend-gas"></span></div>
+            <div class="min-max-box">
+                <div class="min-max-item">Min 24h (Migliore)<br><span id="val-gmin">--</span> <span class="trend-small" id="trend-gmin"></span></div>
+                <div class="min-max-item">Max 24h (Peggiore)<br><span id="val-gmax">--</span> <span class="trend-small" id="trend-gmax"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenitori Grafici 4x Separati -->
+    <div class="charts-wrapper">
+        <div class="chart-container"><canvas id="tempChart"></canvas></div>
+        <div class="chart-container"><canvas id="umidChart"></canvas></div>
+        <div class="chart-container"><canvas id="pressChart"></canvas></div>
+        <div class="chart-container"><canvas id="gasChart"></canvas></div>
+    </div>
+
+    <div class="timestamp" id="last-update">Ultimo aggiornamento: In attesa di connessione...</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, query, orderByChild, limitToLast, onValue, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAobl_IquxYnuUL2Y0rgFf3tRIyyrhpG48",
+            authDomain: "stazione-meteo-esp8266.firebaseapp.com",
+            databaseURL: "https://stazione-meteo-esp8266-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "stazione-meteo-esp8266",
+            storageBucket: "stazione-meteo-esp8266.firebasestorage.app",
+            messagingSenderId: "372345019157",
+            appId: "1:372345019157:web:21d12f82abf3e14a26e71c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+        
+        const storicoRef = query(ref(db, 'MeteoStorico'), orderByChild('timestamp'), limitToLast(576));
+        const datasetIARef = query(ref(db, 'DatasetIA')); 
+
+        const statusDot = document.getElementById('connection-status');
+        const alertBox = document.getElementById('alert-box');
+        
+        // --- MEMORIA GLOBALE ---
+        let ultimaLetturaSensori = null;
+        let archivioDatasetIA = []; 
+        let storicoRecente = []; // Memorizza in RAM locale le ultime 48h scaricate da Firebase
+        
+        let pcaChartInstance1 = null; 
+        let pcaChartInstance2 = null; 
+        let pcaChartInstance3 = null; 
+        let pcaChartInstance4 = null; // NUOVA INSTANZA PCA 20D
+        
+        const modalAI = document.getElementById('ai-modal');
+        const modalPCA = document.getElementById('pca-modal');
+        const TEMPO_ATTESA_MS = 3600000; 
+
+        // --- GESTIONE NOTIFICHE TOAST ---
+        function showToast(message, isSuccess = false) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = message;
+            toast.style.borderLeftColor = isSuccess ? '#00e676' : '#ff5252';
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        function controllaTimerPopup() {
+            const lastTime = localStorage.getItem('lastLabelTime');
+            const now = Date.now();
+            if (!lastTime || (now - parseInt(lastTime)) > TEMPO_ATTESA_MS) {
+                modalAI.style.display = 'flex';
+            }
+        }
+
+        window.chiudiModalTemporaneamente = function(modalId) {
+            if(modalId === 'ai-modal') localStorage.setItem('lastLabelTime', Date.now());
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.apriModalManualmente = function() {
+            if (!ultimaLetturaSensori) { 
+                showToast("Attendi l'arrivo dei dati dai sensori prima di correggere l'IA."); 
+                return; 
+            }
+            modalAI.style.display = 'flex';
+        }
+
+        // ============================================================================
+        // === MOTORE MATEMATICO TEMPORALE (FEATURE ENGINEERING) ===
+        // ============================================================================
+        function calcolaFeatureTemporali(storico, timestampRiferimento, campo) {
+            const tempoInizio = timestampRiferimento - 10800; // 3 ore fa
+            const finestra = storico.filter(r => r.timestamp >= tempoInizio && r.timestamp <= timestampRiferimento);
+
+            if (finestra.length < 2) return { delta: 0, diff_media: 0, pendenza: 0 };
+
+            const valoriY = finestra.map(r => r[campo]);
+            const valoriX = finestra.map(r => (r.timestamp - tempoInizio) / 3600); // asse X in ore
+
+            const mediaY = valoriY.reduce((a, b) => a + b, 0) / valoriY.length;
+            const mediaX = valoriX.reduce((a, b) => a + b, 0) / valoriX.length;
+            
+            const valoreAttuale = valoriY[valoriY.length - 1];
+            const diffMedia = valoreAttuale - mediaY;
+            const delta = valoreAttuale - valoriY[0];
+
+            let num = 0, den = 0;
+            for (let i = 0; i < finestra.length; i++) {
+                num += (valoriX[i] - mediaX) * (valoriY[i] - mediaY);
+                den += Math.pow(valoriX[i] - mediaX, 2);
+            }
+            const pendenza = (den === 0) ? 0 : (num / den);
+
+            return { 
+                delta: Number(delta.toFixed(3)), 
+                diff_media: Number(diffMedia.toFixed(3)), 
+                pendenza: Number(pendenza.toFixed(3)) 
+            };
+        }
+
+        // --- SALVATAGGIO A 16 DIMENSIONI ---
+        window.salvaDatasetIA = function(scenario) {
+            if (!ultimaLetturaSensori || storicoRecente.length === 0) { 
+                showToast("Attendi l'arrivo dei dati storici e in tempo reale prima di salvare!"); 
+                return; 
+            }
+
+            const tsAttuale = Math.floor(Date.now() / 1000);
+
+            const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+            const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+            const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+            const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
+            const datasetRecord = {
+                etichetta: scenario,
+                timestamp: tsAttuale,
+                
+                temperatura: ultimaLetturaSensori.temperatura,
+                umidita: ultimaLetturaSensori.umidita,
+                pressione: ultimaLetturaSensori.pressione,
+                gas_raw: ultimaLetturaSensori.gas_raw,
+
+                t_delta3h: featT.delta, t_diff_media3h: featT.diff_media, t_pendenza3h: featT.pendenza,
+                u_delta3h: featU.delta, u_diff_media3h: featU.diff_media, u_pendenza3h: featU.pendenza,
+                p_delta3h: featP.delta, p_diff_media3h: featP.diff_media, p_pendenza3h: featP.pendenza,
+                g_delta3h: featG.delta, g_diff_media3h: featG.diff_media, g_pendenza3h: featG.pendenza
+            };
+
+            push(ref(db, 'DatasetIA'), datasetRecord)
+                .then(() => { 
+                    window.chiudiModalTemporaneamente('ai-modal'); 
+                    showToast("Dati salvati (16D)! L'IA è stata aggiornata.", true);
+                })
+                .catch((error) => { 
+                    console.error(error); 
+                    showToast("Errore di connessione al database."); 
+                });
+        }
+        setTimeout(controllaTimerPopup, 3000);
+
+        signInAnonymously(auth)
+        .then(() => {
+            console.log("[OK] Autenticazione anonima web riuscita con successo.");
+
+        // --- LETTURA DATASET IA ---
+        onValue(datasetIARef, (snapshot) => {
+            archivioDatasetIA = [];
+            snapshot.forEach((child) => {
+                archivioDatasetIA.push(child.val());
+            });
+            eseguiPredizioneIA(); 
+        });
+
+        // --- ALGORITMO MACHINE LEARNING (k-NN a 16 DIMENSIONI) ---
+        function eseguiPredizioneIA() {
+            const outEl = document.getElementById('ai-prediction-output');
+            const detEl = document.getElementById('ai-prediction-details');
+
+            if (!ultimaLetturaSensori || storicoRecente.length === 0) return;
+
+            // Se il database non è stato ancora migrato a 16D, ferma tutto
+            if (archivioDatasetIA.length < 3 || archivioDatasetIA[0].t_delta3h === undefined) {
+                outEl.innerHTML = `Addestramento in corso... (${archivioDatasetIA.length}/3 minimi)`;
+                detEl.innerHTML = "L'algoritmo richiede dati storici a 16D (esegui la migrazione).";
+                return;
+            }
+
+            const k = Math.min(5, archivioDatasetIA.length);
+            const tsAttuale = Math.floor(Date.now() / 1000);
+
+            // 1. Calcolo della cinematica ATTUALE (le 16 dimensioni di "questo istante")
+            const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+            const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+            const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+            const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
+            const attuale16D = {
+                T_ist: ultimaLetturaSensori.temperatura, T_dlt: featT.delta, T_anm: featT.diff_media, T_pnd: featT.pendenza,
+                U_ist: ultimaLetturaSensori.umidita, U_dlt: featU.delta, U_anm: featU.diff_media, U_pnd: featU.pendenza,
+                P_ist: ultimaLetturaSensori.pressione, P_dlt: featP.delta, P_anm: featP.diff_media, P_pnd: featP.pendenza,
+                G_ist: ultimaLetturaSensori.gas_raw, G_dlt: featG.delta, G_anm: featG.diff_media, G_pnd: featG.pendenza
+            };
+
+            // 2. Estrazione di Minimi e Massimi per Normalizzazione
+            let mins = { T_ist: Infinity, T_dlt: Infinity, T_anm: Infinity, T_pnd: Infinity, U_ist: Infinity, U_dlt: Infinity, U_anm: Infinity, U_pnd: Infinity, P_ist: Infinity, P_dlt: Infinity, P_anm: Infinity, P_pnd: Infinity, G_ist: Infinity, G_dlt: Infinity, G_anm: Infinity, G_pnd: Infinity };
+            let maxs = { T_ist: -Infinity, T_dlt: -Infinity, T_anm: -Infinity, T_pnd: -Infinity, U_ist: -Infinity, U_dlt: -Infinity, U_anm: -Infinity, U_pnd: -Infinity, P_ist: -Infinity, P_dlt: -Infinity, P_anm: -Infinity, P_pnd: -Infinity, G_ist: -Infinity, G_dlt: -Infinity, G_anm: -Infinity, G_pnd: -Infinity };
+
+            const datasetStandardizzato = archivioDatasetIA.map(r => ({
+                etichetta: r.etichetta,
+                T_ist: r.temperatura, T_dlt: r.t_delta3h, T_anm: r.t_diff_media3h, T_pnd: r.t_pendenza3h,
+                U_ist: r.umidita, U_dlt: r.u_delta3h, U_anm: r.u_diff_media3h, U_pnd: r.u_pendenza3h,
+                P_ist: r.pressione, P_dlt: r.p_delta3h, P_anm: r.p_diff_media3h, P_pnd: r.p_pendenza3h,
+                G_ist: r.gas_raw, G_dlt: r.g_delta3h, G_anm: r.g_diff_media3h, G_pnd: r.g_pendenza3h
+            }));
+
+            [...datasetStandardizzato, attuale16D].forEach(r => {
+                for (let key in mins) {
+                    if (r[key] < mins[key]) mins[key] = r[key];
+                    if (r[key] > maxs[key]) maxs[key] = r[key];
+                }
+            });
+
+            const normalize = (val, min, max) => (max === min) ? 0 : (val - min) / (max - min);
+
+            // 3. Calcolo Distanza Euclidea in un Iperspazio a 16 Dimensioni
+            const distanze = datasetStandardizzato.map(record => {
+                let sommaQuadrati = 0;
+                for (let key in mins) {
+                    let diff = normalize(attuale16D[key], mins[key], maxs[key]) - normalize(record[key], mins[key], maxs[key]);
+                    sommaQuadrati += diff * diff;
+                }
+                return { etichetta: record.etichetta, distanza: Math.sqrt(sommaQuadrati) };
+            });
+
+            // 4. Scelta dei K più vicini
+            distanze.sort((a, b) => a.distanza - b.distanza);
+            const kNearest = distanze.slice(0, k);
+            const conteggio = {};
+            kNearest.forEach(vicino => conteggio[vicino.etichetta] = (conteggio[vicino.etichetta] || 0) + 1);
+
+            let bestLabel = "", maxCount = 0;
+            let probStats = [];
+
+            for (const [etichetta, count] of Object.entries(conteggio)) {
+                const prob = Math.round((count / k) * 100);
+                probStats.push(`${etichetta.replace('_', ' ')}: ${prob}%`);
+                if (count > maxCount) { maxCount = count; bestLabel = etichetta; }
+            }
+
+            const icone = { "Sole_Sereno": "☀️ Sole/Sereno", "Nuvoloso": "☁️ Nuvoloso", "Pioggia": "🌧️ Pioggia", "Neve": "❄️ Neve" };
+            outEl.innerHTML = `${icone[bestLabel]} (${Math.round((maxCount / k) * 100)}%)`;
+            detEl.innerHTML = `Affidabilità: calcolata matematicamente su <b>16 dimensioni spaziali/temporali</b>.<br> Distribuzione K-NN: ${probStats.join(' | ')}`;
+        }
+
+        // ============================================================================
+        // === MOTORE MATEMATICO PCA (OGGETTIVO E SCIENTIFICO) ===
+        // ============================================================================
+
+        function getMean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+        
+        function getStdDev(arr, mean) { 
+            const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1);
+            return Math.sqrt(variance) || 1e-8; 
+        }
+
+        function getCovarianceMatrix(matrix) {
+            const nRows = matrix.length;
+            const nCols = matrix[0].length;
+            let cov = Array(nCols).fill(0).map(() => Array(nCols).fill(0));
+            for (let i = 0; i < nCols; i++) {
+                for (let j = i; j < nCols; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < nRows; k++) {
+                        sum += matrix[k][i] * matrix[k][j];
+                    }
+                    cov[i][j] = sum / (nRows - 1);
+                    cov[j][i] = cov[i][j]; 
+                }
+            }
+            return cov;
+        }
+
+        function jacobiEigenSolver(matrix) {
+            const n = matrix.length;
+            let V = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => (i === j ? 1 : 0)));
+            let A = matrix.map(row => [...row]); 
+            let maxIter = 100, iter = 0;
+
+            while (iter < maxIter) {
+                let maxVal = 0, p = 0, q = 1;
+                for (let i = 0; i < n; i++) {
+                    for (let j = i + 1; j < n; j++) {
+                        if (Math.abs(A[i][j]) > maxVal) { maxVal = Math.abs(A[i][j]); p = i; q = j; }
+                    }
+                }
+                if (maxVal < 1e-9) break; 
+
+                let theta;
+                if (A[p][p] === A[q][q]) {
+                    theta = A[p][q] > 0 ? Math.PI / 4 : -Math.PI / 4;
+                } else {
+                    theta = 0.5 * Math.atan((2 * A[p][q]) / (A[p][p] - A[q][q]));
+                }
+
+                let cosT = Math.cos(theta), sinT = Math.sin(theta);
+
+                for (let i = 0; i < n; i++) {
+                    let v_ip = V[i][p], v_iq = V[i][q];
+                    V[i][p] = cosT * v_ip + sinT * v_iq;
+                    V[i][q] = -sinT * v_ip + cosT * v_iq;
+
+                    if (i !== p && i !== q) {
+                        let a_ip = A[i][p], a_iq = A[i][q];
+                        A[i][p] = A[p][i] = cosT * a_ip + sinT * a_iq;
+                        A[i][q] = A[q][i] = -sinT * a_ip + cosT * a_iq;
+                    }
+                }
+                let a_pp = A[p][p], a_qq = A[q][q], a_pq = A[p][q];
+                A[p][p] = cosT * cosT * a_pp + 2 * cosT * sinT * a_pq + sinT * sinT * a_qq;
+                A[q][q] = sinT * sinT * a_pp - 2 * cosT * sinT * a_pq + cosT * cosT * a_qq;
+                A[p][q] = A[q][p] = 0;
+                iter++;
+            }
+
+            let eigenvalues = [];
+            for (let i = 0; i < n; i++) eigenvalues.push({ val: A[i][i], index: i });
+            eigenvalues.sort((a, b) => b.val - a.val);
+
+            let sortedEigenvectors = [];
+            for (let i = 0; i < n; i++) {
+                let vec = [];
+                for (let j = 0; j < n; j++) vec.push(V[j][eigenvalues[i].index]);
+                sortedEigenvectors.push(vec);
+            }
+
+            return { eigenvalues: eigenvalues.map(e => e.val), eigenvectors: sortedEigenvectors };
+        }
+
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
+
+        function eseguiEPlottaPCA(features, rawData, labels, canvasId, textContentId, existingChartInstance, currentRawData) {
+            let means = [], stdDevs = [];
+            for (let j = 0; j < features.length; j++) {
+                let col = rawData.map(row => row[j]);
+                means.push(getMean(col));
+                stdDevs.push(getStdDev(col, means[j]));
+            }
+            let zData = rawData.map(row => row.map((val, j) => (val - means[j]) / stdDevs[j]));
+
+            let covMatrix = getCovarianceMatrix(zData);
+            let eigenData = jacobiEigenSolver(covMatrix);
+            
+            let totalVariance = eigenData.eigenvalues.reduce((a, b) => a + b, 0);
+            let varExplained = eigenData.eigenvalues.map(val => (val / totalVariance) * 100);
+
+            let projectedData = [];
+            for (let i = 0; i < zData.length; i++) {
+                let pc1 = 0, pc2 = 0;
+                for (let j = 0; j < features.length; j++) {
+                    pc1 += zData[i][j] * eigenData.eigenvectors[0][j];
+                    pc2 += zData[i][j] * eigenData.eigenvectors[1][j];
+                }
+                projectedData.push({ x: pc1, y: pc2, label: labels[i] });
+            }
+
+            let currentPc1 = 0, currentPc2 = 0;
+            let currentZScores = []; 
+            if (currentRawData) {
+                for (let j = 0; j < features.length; j++) {
+                    let zValCurr = (currentRawData[j] - means[j]) / stdDevs[j];
+                    currentZScores.push(zValCurr);
+                    currentPc1 += zValCurr * eigenData.eigenvectors[0][j];
+                    currentPc2 += zValCurr * eigenData.eigenvectors[1][j];
+                }
+            }
+
+            let mathHTML = "";
+            for(let i=0; i<2; i++) {
+                let eq = [];
+                let eqAttuale = [];
+                for(let j=0; j<features.length; j++) {
+                    let weight = eigenData.eigenvectors[i][j];
+                    let featureName = features[j];
+                    eq.push(`<span style="display:inline-block; width:120px; text-align:right;">${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${featureName}</span>`);
+                    
+                    if (currentRawData) {
+                        let zScore = currentZScores[j];
+                        eqAttuale.push(`<span style="display:inline-block; width:120px; text-align:right;" title="${featureName}">(${weight >= 0 ? '+' : ''}${weight.toFixed(2)} * ${zScore >= 0 ? '+' : ''}${zScore.toFixed(2)})</span>`);
+                    }
+                }
+                mathHTML += `<b>PC${i+1}</b> (Spiega il <b>${varExplained[i].toFixed(1)}%</b> della varianza totale):<br>`;
+                mathHTML += `${eq.join(" ")}<br>`;
+                
+                if (currentRawData) {
+                    let valAttuale = i === 0 ? currentPc1 : currentPc2;
+                    mathHTML += `<span style="color: #00e676;"><b>PC${i+1} Attuale:</b>&nbsp; ${eqAttuale.join(" + ")} = <b>${valAttuale >= 0 ? '+' : ''}${valAttuale.toFixed(2)}</b></span><br>`;
+                }
+                mathHTML += `<br>`;
+            }
+            
+            if (currentRawData) {
+                mathHTML += `<div style="font-size: 0.85em; color: #888; margin-top: -10px; white-space: normal;">* Nota scientifica: i valori attuali inseriti nelle parentesi sono gli <b>Z-scores</b> (dati standardizzati), non i valori grezzi dei sensori. Questo garantisce la validità topologica della proiezione.</div>`;
+            }
+
+            document.getElementById(textContentId).innerHTML = mathHTML;
+
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            const datasets = [
+                { label: '☀️ Sole/Sereno', color: '#fbc02d', data: [] },
+                { label: '☁️ Nuvoloso', color: '#757575', data: [] },
+                { label: '🌧️ Pioggia', color: '#1976d2', data: [] },
+                { label: '❄️ Neve', color: '#e0e0e0', data: [] }
+            ];
+
+            projectedData.forEach(pt => {
+                if (pt.label === 'Sole_Sereno') datasets[0].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Nuvoloso') datasets[1].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Pioggia') datasets[2].data.push({x: pt.x, y: pt.y});
+                else if (pt.label === 'Neve') datasets[3].data.push({x: pt.x, y: pt.y});
+            });
+
+            const activeDatasets = datasets.filter(ds => ds.data.length > 0).map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: ds.color,
+                borderColor: '#ffffff',
+                borderWidth: 1,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }));
+
+            if (currentRawData) {
+                activeDatasets.push({
+                    label: '🟢 SITUAZIONE ATTUALE',
+                    data: [{x: currentPc1, y: currentPc2}],
+                    backgroundColor: '#00e676',
+                    borderColor: '#ffffff',
+                    borderWidth: 2,
+                    pointRadius: 10,
+                    pointHoverRadius: 12
+                });
+            }
+
+            if (existingChartInstance) existingChartInstance.destroy();
+
+            return new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: activeDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } },
+                        tooltip: { callbacks: { label: function(ctx) { return `${ctx.dataset.label}`; } } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: `PC 1 (${varExplained[0].toFixed(1)}%)`, color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { title: { display: true, text: `PC 2 (${varExplained[1].toFixed(1)}%)`, color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#333' } }
+                    }
+                }
+            });
+        }
+
+        window.apriModalPCA = function() {
+            if (archivioDatasetIA.length < 5) {
+                showToast("Dati insufficienti per la PCA. Servono almeno 5 etichette nel Dataset.");
+                return;
+            }
+
+            modalPCA.style.display = 'flex';
+
+            let labels = archivioDatasetIA.map(row => row.etichetta);
+
+            // PCA 1
+            const features1 = ["Temp", "Umid", "Press", "Gas"];
+            let rawData1 = archivioDatasetIA.map(row => [row.temperatura, row.umidita, row.pressione, row.gas_raw]);
+            let currentRawData1 = ultimaLetturaSensori ? [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw] : null;
+            pcaChartInstance1 = eseguiEPlottaPCA(features1, rawData1, labels, 'pcaChart1', 'pca-math-content1', pcaChartInstance1, currentRawData1);
+
+            // PCA 2
+            const features2 = ["Temp", "Umid", "Press", "Gas", "Min_Sin", "Min_Cos", "Day_Sin", "Day_Cos"];
+            let rawData2 = archivioDatasetIA.map(row => {
+                let d = new Date(row.timestamp * 1000);
+                let minuti_giornata = (d.getHours() * 60) + d.getMinutes();
+                let giorno_anno = getDayOfYear(d);
+                let min_sin = Math.sin(2 * Math.PI * minuti_giornata / 1440);
+                let min_cos = Math.cos(2 * Math.PI * minuti_giornata / 1440);
+                let day_sin = Math.sin(2 * Math.PI * giorno_anno / 365.25);
+                let day_cos = Math.cos(2 * Math.PI * giorno_anno / 365.25);
+                return [row.temperatura, row.umidita, row.pressione, row.gas_raw, min_sin, min_cos, day_sin, day_cos];
+            });
+
+            let currentRawData2 = null;
+            if (ultimaLetturaSensori) {
+                let d_curr = new Date(ultimaLetturaSensori.timestamp * 1000);
+                let min_curr = (d_curr.getHours() * 60) + d_curr.getMinutes();
+                let day_curr = getDayOfYear(d_curr);
+                let min_sin_curr = Math.sin(2 * Math.PI * min_curr / 1440);
+                let min_cos_curr = Math.cos(2 * Math.PI * min_curr / 1440);
+                let day_sin_curr = Math.sin(2 * Math.PI * day_curr / 365.25);
+                let day_cos_curr = Math.cos(2 * Math.PI * day_curr / 365.25);
+                currentRawData2 = [ultimaLetturaSensori.temperatura, ultimaLetturaSensori.umidita, ultimaLetturaSensori.pressione, ultimaLetturaSensori.gas_raw, min_sin_curr, min_cos_curr, day_sin_curr, day_cos_curr];
+            }
+            pcaChartInstance2 = eseguiEPlottaPCA(features2, rawData2, labels, 'pcaChart2', 'pca-math-content2', pcaChartInstance2, currentRawData2);
+
+            // PCA 3: SPAZIO TERMODINAMICO TEMPORALE (16 DIMENSIONI)
+            if (archivioDatasetIA[0] && archivioDatasetIA[0].t_delta3h === undefined) {
+                document.getElementById('pca-math-content3').innerHTML = "<span style='color:#ff5252;'>Errore: i dati nel database non contengono le 16 dimensioni. Esegui lo script di migrazione.</span>";
+                document.getElementById('pca-math-content4').innerHTML = "<span style='color:#ff5252;'>Impossibile generare la PCA 4 senza i dati cinematici.</span>";
+            } else {
+                const features3 = [
+                    "T_Ist", "T_Dlt", "T_Anm", "T_Pnd",
+                    "U_Ist", "U_Dlt", "U_Anm", "U_Pnd",
+                    "P_Ist", "P_Dlt", "P_Anm", "P_Pnd",
+                    "G_Ist", "G_Dlt", "G_Anm", "G_Pnd"
+                ];
+
+                let rawData3 = archivioDatasetIA.map(row => [
+                    row.temperatura, row.t_delta3h, row.t_diff_media3h, row.t_pendenza3h,
+                    row.umidita, row.u_delta3h, row.u_diff_media3h, row.u_pendenza3h,
+                    row.pressione, row.p_delta3h, row.p_diff_media3h, row.p_pendenza3h,
+                    row.gas_raw, row.g_delta3h, row.g_diff_media3h, row.g_pendenza3h
+                ]);
+
+                let currentRawData3 = null;
+                if (ultimaLetturaSensori && storicoRecente.length > 0) {
+                    const tsAttuale = Math.floor(Date.now() / 1000);
+                    const featT = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'temperatura');
+                    const featU = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'umidita');
+                    const featP = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'pressione');
+                    const featG = calcolaFeatureTemporali(storicoRecente, tsAttuale, 'gas_raw');
+
+                    currentRawData3 = [
+                        ultimaLetturaSensori.temperatura, featT.delta, featT.diff_media, featT.pendenza,
+                        ultimaLetturaSensori.umidita, featU.delta, featU.diff_media, featU.pendenza,
+                        ultimaLetturaSensori.pressione, featP.delta, featP.diff_media, featP.pendenza,
+                        ultimaLetturaSensori.gas_raw, featG.delta, featG.diff_media, featG.pendenza
+                    ];
+                }
+
+                pcaChartInstance3 = eseguiEPlottaPCA(features3, rawData3, labels, 'pcaChart3', 'pca-math-content3', pcaChartInstance3, currentRawData3);
+
+                // --- PCA 4: SPAZIO ASSOLUTO (20 DIMENSIONI) ---
+                const features4 = [
+                    "T_Ist", "T_Dlt", "T_Anm", "T_Pnd",
+                    "U_Ist", "U_Dlt", "U_Anm", "U_Pnd",
+                    "P_Ist", "P_Dlt", "P_Anm", "P_Pnd",
+                    "G_Ist", "G_Dlt", "G_Anm", "G_Pnd",
+                    "Min_S", "Min_C", "Day_S", "Day_C"
+                ];
+
+                let rawData4 = archivioDatasetIA.map(row => {
+                    let d = new Date(row.timestamp * 1000);
+                    let minuti_giornata = (d.getHours() * 60) + d.getMinutes();
+                    let giorno_anno = getDayOfYear(d);
+                    let min_sin = Math.sin(2 * Math.PI * minuti_giornata / 1440);
+                    let min_cos = Math.cos(2 * Math.PI * minuti_giornata / 1440);
+                    let day_sin = Math.sin(2 * Math.PI * giorno_anno / 365.25);
+                    let day_cos = Math.cos(2 * Math.PI * giorno_anno / 365.25);
+
+                    return [
+                        row.temperatura, row.t_delta3h, row.t_diff_media3h, row.t_pendenza3h,
+                        row.umidita, row.u_delta3h, row.u_diff_media3h, row.u_pendenza3h,
+                        row.pressione, row.p_delta3h, row.p_diff_media3h, row.p_pendenza3h,
+                        row.gas_raw, row.g_delta3h, row.g_diff_media3h, row.g_pendenza3h,
+                        min_sin, min_cos, day_sin, day_cos
+                    ];
+                });
+
+                let currentRawData4 = null;
+                if (currentRawData3 && ultimaLetturaSensori) {
+                    let d_curr = new Date(ultimaLetturaSensori.timestamp * 1000);
+                    let min_curr = (d_curr.getHours() * 60) + d_curr.getMinutes();
+                    let day_curr = getDayOfYear(d_curr);
+                    let min_sin_curr = Math.sin(2 * Math.PI * min_curr / 1440);
+                    let min_cos_curr = Math.cos(2 * Math.PI * min_curr / 1440);
+                    let day_sin_curr = Math.sin(2 * Math.PI * day_curr / 365.25);
+                    let day_cos_curr = Math.cos(2 * Math.PI * day_curr / 365.25);
+
+                    // Espandiamo le 16 dimensioni attuali aggiungendo le 4 coordinate temporali
+                    currentRawData4 = [...currentRawData3, min_sin_curr, min_cos_curr, day_sin_curr, day_cos_curr];
+                }
+
+                pcaChartInstance4 = eseguiEPlottaPCA(features4, rawData4, labels, 'pcaChart4', 'pca-math-content4', pcaChartInstance4, currentRawData4);
+            }
+        }
+
+        function initSingleChart(canvasId, label, colorHex, bgColorRgba) {
+            return new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: label, borderColor: colorHex, backgroundColor: bgColorRgba, data: [], borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { labels: { color: '#fff' } } },
+                    scales: { x: { ticks: { color: '#aaa', maxTicksLimit: 12 }, grid: { color: '#333' } }, y: { type: 'linear', position: 'left', ticks: { color: colorHex }, grid: { color: '#333' } } }
+                }
+            });
+        }
+
+        const tempChart = initSingleChart('tempChart', 'Temperatura (°C)', '#ff5252', 'rgba(255, 82, 82, 0.1)');
+        const umidChart = initSingleChart('umidChart', 'Umidità (%)', '#448aff', 'rgba(68, 138, 255, 0.1)');
+        const pressChart = initSingleChart('pressChart', 'Pressione (hPa)', '#b2ff59', 'rgba(178, 255, 89, 0.1)');
+        const gasChart = initSingleChart('gasChart', 'Gas (Raw)', '#ffc400', 'rgba(255, 196, 0, 0.1)');
+
+        function getTrendHTML(delta, threshold) { 
+            if (delta > threshold) return '<span class="up">▲</span>'; 
+            if (delta < -threshold) return '<span class="down">▼</span>'; 
+            return '<span class="stable">▶</span>'; 
+        }
+
+        function calculateDewPoint(temp, humidity) { const a = 17.27, b = 237.7; const alpha = ((a * temp) / (b + temp)) + Math.log(humidity / 100.0); return (b * alpha) / (a - alpha); }
+        function checkAlerts(temp, humidity, dewPoint, deltaPressione3h) { alertBox.className = "alert-banner"; alertBox.innerHTML = ""; if (deltaPressione3h <= -3.0) { alertBox.classList.add("alert-storm"); alertBox.innerHTML = "⚠️ ALLARME METEO: Crollo barometrico. Rischio fenomeni violenti."; return; } if (temp <= 3.0 && dewPoint <= 0.0) { alertBox.classList.add("alert-ice"); alertBox.innerHTML = "❄️ ATTENZIONE GHIACCIO: Formazione brina al suolo."; return; } if ((temp - dewPoint) <= 1.5 && humidity >= 90.0) { alertBox.classList.add("alert-fog"); alertBox.innerHTML = "🌫️ RISCHIO NEBBIA: Visibilità ridotta."; return; } }
+        function calculateForecast(deltaPressione3h) { if (Math.abs(deltaPressione3h) < 1.0) { return "Condizioni Costanti / Stabili ➖"; } if (deltaPressione3h >= 1.0) { if (deltaPressione3h >= 3.0) return "Forte Miglioramento / Vento 💨"; return "In Miglioramento 📈"; } if (deltaPressione3h <= -1.0) { if (deltaPressione3h <= -3.0) return "Forte Peggioramento / Instabilità ⛈️"; return "In Peggioramento 📉"; } return "Analisi in corso..."; }
+
+        // --- LETTURA SENSORI REAL-TIME ---
+        onValue(storicoRef, (snapshot) => {
+            const records = [];
+            snapshot.forEach((child) => { records.push(child.val()); });
+
+            if (records.length > 0) {
+                storicoRecente = records;
+
+                const dataAttuale = records[records.length - 1];
+                ultimaLetturaSensori = dataAttuale;
+                eseguiPredizioneIA(); 
+                
+                const dewPoint = calculateDewPoint(dataAttuale.temperatura, dataAttuale.umidita);
+                document.getElementById('val-dew').innerText = dewPoint.toFixed(1);
+                document.getElementById('val-temp').innerText = dataAttuale.temperatura.toFixed(1);
+                document.getElementById('val-umid').innerText = dataAttuale.umidita.toFixed(1);
+                document.getElementById('val-press').innerText = dataAttuale.pressione.toFixed(1);
+                document.getElementById('val-gas').innerText = dataAttuale.gas_raw;
+
+                const date = new Date(dataAttuale.timestamp * 1000); 
+                document.getElementById('last-update').innerText = `Ultimo aggiornamento: ${date.toLocaleString('it-IT')}`;
+                statusDot.classList.add('connected');
+
+                let deltaP = 0;
+
+                if (records.length > 1) {
+                    const offset3h = Math.min(records.length, 36); 
+                    const dataVecchia = records[records.length - offset3h]; 
+                    
+                    const deltaT = dataAttuale.temperatura - dataVecchia.temperatura;
+                    const deltaH = dataAttuale.umidita - dataVecchia.umidita;
+                    deltaP = dataAttuale.pressione - dataVecchia.pressione;
+                    const deltaG = dataAttuale.gas_raw - dataVecchia.gas_raw;
+
+                    document.getElementById('trend-temp').innerHTML = getTrendHTML(deltaT, 0.2);
+                    document.getElementById('trend-umid').innerHTML = getTrendHTML(deltaH, 1.0);
+                    document.getElementById('trend-press').innerHTML = getTrendHTML(deltaP, 0.5); 
+                    document.getElementById('trend-gas').innerHTML = getTrendHTML(deltaG, 20);
+
+                    const previsione = calculateForecast(deltaP);
+                    const minutiStorico = (offset3h - 1) * 5; 
+                    document.getElementById('forecast-output').innerHTML = `${previsione} <br><span style="font-size:0.4em; color:#777;">(Tendenza su ${minutiStorico} min - Delta P: ${deltaP.toFixed(2)} hPa)</span>`;
+                    
+                    checkAlerts(dataAttuale.temperatura, dataAttuale.umidita, dewPoint, deltaP);
+                }
+                
+                const last24h = records.slice(-288); const prev24h = records.slice(-576, -288); 
+
+                if (last24h.length > 0) {
+                    const labels = []; const tempData = []; const pressData = []; const umidData = []; const gasData = [];
+                    last24h.forEach(rec => {
+                        const d = new Date(rec.timestamp * 1000); labels.push(d.toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'}));
+                        tempData.push(rec.temperatura); pressData.push(rec.pressione); umidData.push(rec.umidita); gasData.push(rec.gas_raw);
+                    });
+
+                    const windowSize = 5; 
+                    const smoothedGasData = gasData.map((val, idx, arr) => {
+                        const start = Math.max(0, idx - windowSize + 1);
+                        const subset = arr.slice(start, idx + 1);
+                        return subset.reduce((a, b) => a + b, 0) / subset.length;
+                    });
+
+                    tempChart.data.labels = labels; tempChart.data.datasets[0].data = tempData; tempChart.update();
+                    umidChart.data.labels = labels; umidChart.data.datasets[0].data = umidData; umidChart.update();
+                    pressChart.data.labels = labels; pressChart.data.datasets[0].data = pressData; pressChart.update();
+                    gasChart.data.labels = labels; gasChart.data.datasets[0].data = smoothedGasData; gasChart.update();
+
+                    const max24 = Math.max(...last24h.map(r => r.temperatura)); const min24 = Math.min(...last24h.map(r => r.temperatura));
+                    const maxU24 = Math.max(...last24h.map(r => r.umidita)); const minU24 = Math.min(...last24h.map(r => r.umidita));
+                    const maxP24 = Math.max(...last24h.map(r => r.pressione)); const minP24 = Math.min(...last24h.map(r => r.pressione));
+                    const maxG24 = Math.max(...last24h.map(r => r.gas_raw)); const minG24 = Math.min(...last24h.map(r => r.gas_raw));
+                    
+                    document.getElementById('val-max').innerText = max24.toFixed(1); document.getElementById('val-min').innerText = min24.toFixed(1);
+                    document.getElementById('val-umax').innerText = maxU24.toFixed(1); document.getElementById('val-umin').innerText = minU24.toFixed(1);
+                    document.getElementById('val-pmax').innerText = maxP24.toFixed(1); document.getElementById('val-pmin').innerText = minP24.toFixed(1);
+                    document.getElementById('val-gmax').innerText = maxG24; document.getElementById('val-gmin').innerText = minG24;
+
+                    if (prev24h.length > 0) {
+                        const maxPrev = Math.max(...prev24h.map(r => r.temperatura)); const minPrev = Math.min(...prev24h.map(r => r.temperatura));
+                        const maxUPrev = Math.max(...prev24h.map(r => r.umidita)); const minUPrev = Math.min(...prev24h.map(r => r.umidita));
+                        const maxPPrev = Math.max(...prev24h.map(r => r.pressione)); const minPPrev = Math.min(...prev24h.map(r => r.pressione));
+                        const maxGPrev = Math.max(...prev24h.map(r => r.gas_raw)); const minGPrev = Math.min(...prev24h.map(r => r.gas_raw));
+                        
+                        document.getElementById('trend-max').innerHTML = getTrendHTML(max24 - maxPrev, 0.2); document.getElementById('trend-min').innerHTML = getTrendHTML(min24 - minPrev, 0.2);
+                        document.getElementById('trend-umax').innerHTML = getTrendHTML(maxU24 - maxUPrev, 1.0); document.getElementById('trend-umin').innerHTML = getTrendHTML(minU24 - minUPrev, 1.0);
+                        document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5); document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5);
+                        document.getElementById('trend-gmax').innerHTML = getTrendHTML(maxG24 - maxGPrev, 20); document.getElementById('trend-gmin').innerHTML = getTrendHTML(minG24 - minGPrev, 20);
+                    }
+                }
+            }
+        });
+    }) 
+        .catch((error) => {
+            console.error("Errore di autenticazione:", error.code, error.message);
+            document.getElementById('last-update').innerText = "Errore di accesso al DB: " + error.message;
+        });
+    </script>
+</body>
+</html>
