@@ -336,6 +336,48 @@
                 </div>
             </div>
 
+            <div class="pca-section-title">4. Punto di Rugiada (Dew Point)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">Calcolato usando l'approssimazione di Magnus-Tetens per la pressione di vapore saturo:</p>
+                <div class="pca-math">
+                    α = [ (17.27 · T) / (237.7 + T) ] + ln(U / 100)<br>
+                    T_dew = (237.7 · α) / (17.27 - α)
+                </div>
+            </div>
+
+            <div class="pca-section-title">5. Temperatura Percepita (Apparent Temperature)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">Stima l'indice di calore calcolando prima la pressione del vapore acqueo (e):</p>
+                <div class="pca-math">
+                    e = (U / 100) · 6.105 · exp[ (17.27 · T) / (237.7 + T) ]<br>
+                    T_percepita = T + (0.33 · e) - 4.00
+                </div>
+            </div>
+
+            <div class="pca-section-title">6. Umidità Assoluta</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">Esprime la densità di vapore acqueo nell'aria (in grammi per metro cubo):</p>
+                <div class="pca-math">
+                    U_assoluta = [ 6.112 · exp( (17.67 · T) / (T + 243.5) ) · U · 2.1674 ] / (273.15 + T)
+                </div>
+            </div>
+
+            <div class="pca-section-title">7. Altezza Base Nubi (Cloud Base)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">Stima basata sullo spread (differenza) tra temperatura e punto di rugiada, assumendo un gradiente adiabatico di 125m/°C:</p>
+                <div class="pca-math">
+                    H_nubi = (T - T_dew) · 125 [metri]
+                </div>
+            </div>
+
+            <div class="pca-section-title">8. Air Quality Index (Stima AQI)</div>
+            <div class="pca-text-box">
+                <p style="margin-top:0;">Mappatura del valore grezzo del sensore MQ (0-1024) in una percentuale di purezza dell'aria:</p>
+                <div class="pca-math">
+                    AQI(%) = 100 - [ (Gas_raw - 50) / (800 - 50) ] · 100
+                </div>
+            </div>
+
             <div class="pca-close-wrapper">
                 <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('formule-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Formule</button>
             </div>
