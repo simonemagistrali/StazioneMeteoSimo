@@ -198,6 +198,20 @@
         .timestamp { margin-top: 30px; margin-bottom: 30px; color: #888888; font-size: 0.9em; text-align: center;}
         .status-dot { height: 12px; width: 12px; background-color: #ff3d00; border-radius: 50%; display: inline-block; margin-right: 8px; }
         .status-dot.connected { background-color: #00e676; }
+
+        /* Stili Laboratorio Analisi Dati */
+        .btn-lab {
+            background-color: transparent; border: 1px solid #00b0ff; color: #00b0ff;
+            border-radius: 12px; font-size: 1.1em; cursor: pointer; margin-top: 20px; margin-left: 15px;
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; 
+            padding: 15px 30px; font-weight: 600;
+        }
+        .btn-lab:hover { background-color: #00b0ff; color: #121212; box-shadow: 0 0 20px rgba(0, 176, 255, 0.4); transform: translateY(-3px); }
+        
+        .corr-table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: #2c2c2c; border-radius: 8px; overflow: hidden; }
+        .corr-table th, .corr-table td { padding: 12px; text-align: center; border: 1px solid #444; }
+        .corr-table th { background-color: #1a1a1a; color: #00b0ff; }
+        .corr-cell { font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
     </style>
 </head>
 <body>
@@ -384,6 +398,35 @@
         </div>
     </div>
 
+    <!-- OVERLAY POPUP PER LABORATORIO SCIENTIFICO -->
+    <div class="ai-modal-overlay" id="lab-modal">
+        <div class="pca-modal-content" style="max-width: 900px;">
+            <div class="ai-modal-title" style="color: #00b0ff;">Laboratorio di Ricerca Scientifica 🔬</div>
+            <div class="ai-modal-desc">Strumenti di analisi dati avanzata per esplorare la termodinamica atmosferica locale in tempo reale.</div>
+            
+            <div class="pca-section-title">1. Spazio delle Fasi (Attrattore Termodinamico)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">Visualizza lo stato del sistema meteorologico non rispetto al tempo, ma rispetto alla sua derivata (T vs ΔT). Un sistema stabile forma un'orbita ciclica. Interruzioni dell'orbita indicano perturbazioni caotiche.</p>
+            <div class="pca-chart-container">
+                <canvas id="phaseChart"></canvas>
+            </div>
+
+            <div class="pca-section-title" style="margin-top: 30px;">2. Matrice di Correlazione Dinamica (Pearson)</div>
+            <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">Misura l'intensità della relazione lineare tra le variabili nelle ultime 24 ore. Valori vicini a +1 indicano proporzionalità diretta, vicini a -1 proporzionalità inversa. I valori si aggiornano in base al dataset in streaming.</p>
+            <table class="corr-table" id="corr-matrix-table">
+                <thead>
+                    <tr><th></th><th>Temperatura</th><th>Umidità</th><th>Pressione</th><th>Qualità Aria</th></tr>
+                </thead>
+                <tbody id="corr-matrix-body">
+                    <!-- Riempito via JS -->
+                </tbody>
+            </table>
+
+            <div class="pca-close-wrapper">
+                <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('lab-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Laboratorio</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast-msg" class="toast"></div>
 
@@ -480,6 +523,9 @@
         <button class="btn-formule" onclick="apriModalFormule()">
             🧮 Esplora le Formule Matematiche
         </button>
+        <button class="btn-lab" onclick="apriModalLab()">
+            🔬 Laboratorio di Ricerca
+        </button>
     </div>
 
     <script type="module">
@@ -553,6 +599,115 @@
 
         window.apriModalFormule = function() {
             document.getElementById('formule-modal').style.display = 'flex';
+        }
+
+        window.apriModalLab = function() {
+            document.getElementById('lab-modal').style.display = 'flex';
+            if (storicoRecente && storicoRecente.length > 0) {
+                aggiornaLaboratorioScientifico(storicoRecente);
+            } else {
+                showToast("Dati in caricamento per il laboratorio...");
+            }
+        }
+
+        let phaseChartInstance = null;
+
+        function calcolaCorrelazionePearson(x, y) {
+            let n = x.length;
+            let sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0, sum_y2 = 0;
+            for (let i = 0; i < n; i++) {
+                sum_x += x[i]; sum_y += y[i]; sum_xy += (x[i] * y[i]);
+                sum_x2 += (x[i] * x[i]); sum_y2 += (y[i] * y[i]);
+            }
+            let numerator = (n * sum_xy) - (sum_x * sum_y);
+            let denominator = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
+            if (denominator === 0) return 0;
+            return numerator / denominator;
+        }
+
+        function getColoreCorrelazione(valore) {
+            if (valore >= 0) {
+                let opacity = Math.min(1, valore * 1.2);
+                return `rgba(0, 230, 118, ${opacity})`; // Verde
+            } else {
+                let opacity = Math.min(1, Math.abs(valore) * 1.2);
+                return `rgba(255, 82, 82, ${opacity})`; // Rosso
+            }
+        }
+
+        function aggiornaLaboratorioScientifico(records) {
+            const last24h = records.slice(-288);
+            if (last24h.length < 2) return;
+
+            // 1. Spazio delle Fasi (Temperatura vs Delta Temperatura)
+            let phaseData = [];
+            for (let i = 1; i < last24h.length; i++) {
+                let currentT = last24h[i].temperatura;
+                let prevT = last24h[i-1].temperatura;
+                let deltaT = currentT - prevT;
+                phaseData.push({ x: currentT, y: deltaT });
+            }
+
+            const ctxPhase = document.getElementById('phaseChart').getContext('2d');
+            if (phaseChartInstance) phaseChartInstance.destroy();
+
+            phaseChartInstance = new Chart(ctxPhase, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Traiettoria Termodinamica (Ultime 24h)',
+                        data: phaseData,
+                        borderColor: 'rgba(0, 176, 255, 0.6)',
+                        backgroundColor: '#00b0ff',
+                        borderWidth: 1.5,
+                        pointRadius: 2,
+                        showLine: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Stato Attuale',
+                        data: [phaseData[phaseData.length - 1]],
+                        backgroundColor: '#00e676',
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        pointRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Temperatura (°C)', color: '#aaa' }, grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                        y: { title: { display: true, text: 'Δ Temperatura (dT/dt)', color: '#aaa' }, grid: { color: '#333' }, ticks: { color: '#aaa' } }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
+            });
+
+            // 2. Matrice di Correlazione
+            let arrT = last24h.map(r => r.temperatura);
+            let arrU = last24h.map(r => r.umidita);
+            let arrP = last24h.map(r => r.pressione);
+            let arrG = last24h.map(r => r.gas_raw);
+
+            let vars = [
+                { name: 'Temperatura', data: arrT },
+                { name: 'Umidità', data: arrU },
+                { name: 'Pressione', data: arrP },
+                { name: 'Qualità Aria', data: arrG }
+            ];
+
+            let tbodyHtml = "";
+            for (let i = 0; i < vars.length; i++) {
+                tbodyHtml += `<tr><th style="background-color:#1a1a1a; color:#00b0ff; text-align:left;">${vars[i].name}</th>`;
+                for (let j = 0; j < vars.length; j++) {
+                    let corr = calcolaCorrelazionePearson(vars[i].data, vars[j].data);
+                    let bgColor = getColoreCorrelazione(corr);
+                    let textColor = Math.abs(corr) > 0.5 ? '#fff' : '#ccc';
+                    tbodyHtml += `<td class="corr-cell" style="background-color: ${bgColor}; color: ${textColor};">${corr.toFixed(2)}</td>`;
+                }
+                tbodyHtml += `</tr>`;
+            }
+            document.getElementById('corr-matrix-body').innerHTML = tbodyHtml;
         }
 
         // ============================================================================
@@ -1214,6 +1369,11 @@
                         document.getElementById('trend-pmax').innerHTML = getTrendHTML(maxP24 - maxPPrev, 0.5); document.getElementById('trend-pmin').innerHTML = getTrendHTML(minP24 - minPPrev, 0.5);
                         document.getElementById('trend-gmax').innerHTML = getTrendHTML(maxG24 - maxGPrev, 20); document.getElementById('trend-gmin').innerHTML = getTrendHTML(minG24 - minGPrev, 20);
                     }
+                }
+
+                // Se il laboratorio è aperto, aggiorna in tempo reale i grafici scientifici
+                if (document.getElementById('lab-modal').style.display === 'flex') {
+                    aggiornaLaboratorioScientifico(storicoRecente);
                 }
             }
         });
