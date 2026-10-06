@@ -95,9 +95,6 @@ void setup() {
   Serial.println("[OK] Connessione a Firebase inizializzata.");
   
   Firebase.reconnectWiFi(true);
-
-  // Forza l'invio immediato al primo ciclo utile
-  timerInvio = millis() - INTERVALLO_INVIO;
 }
 
 void loop() {
