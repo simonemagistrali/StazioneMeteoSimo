@@ -409,6 +409,9 @@
             <div class="pca-chart-container">
                 <canvas id="phaseChart"></canvas>
             </div>
+            <div id="phase-analysis" class="pca-text-box" style="margin-top: 15px; border-left: 4px solid #00b0ff; background-color: rgba(0, 176, 255, 0.05); color: #ddd; font-size: 0.9em; line-height: 1.6;">
+                <i>Analisi matematica in corso...</i>
+            </div>
 
             <div class="pca-section-title" style="margin-top: 30px;">2. Matrice di Correlazione Dinamica (Pearson)</div>
             <p style="font-size: 0.85em; color: #888; margin-top: -5px; margin-bottom: 10px;">Misura l'intensità della relazione lineare tra le variabili nelle ultime 24 ore. Valori vicini a +1 indicano proporzionalità diretta, vicini a -1 proporzionalità inversa. I valori si aggiornano in base al dataset in streaming.</p>
@@ -420,6 +423,9 @@
                     <!-- Riempito via JS -->
                 </tbody>
             </table>
+            <div id="corr-analysis" class="pca-text-box" style="margin-top: 15px; border-left: 4px solid #00e676; background-color: rgba(0, 230, 118, 0.05); color: #ddd; font-size: 0.9em; line-height: 1.6;">
+                <i>Analisi statistica in corso...</i>
+            </div>
 
             <div class="pca-close-wrapper">
                 <button class="ai-btn-close" onclick="chiudiModalTemporaneamente('lab-modal')" style="background-color: #333; border: 1px solid #555; padding: 12px 30px; color: white;">Chiudi Laboratorio</button>
@@ -708,6 +714,49 @@
                 tbodyHtml += `</tr>`;
             }
             document.getElementById('corr-matrix-body').innerHTML = tbodyHtml;
+
+            // --- Generazione testo dinamico Spazio Fasi ---
+            let currPoint = phaseData[phaseData.length - 1];
+            let phaseAnalysisText = "<b>Stato Attuale:</b> ";
+            if (currPoint.y > 0.08) {
+                phaseAnalysisText += "Il sistema è in <b>fase di forte riscaldamento</b>. ";
+            } else if (currPoint.y < -0.08) {
+                phaseAnalysisText += "Il sistema è in <b>fase di forte raffreddamento</b>. ";
+            } else {
+                phaseAnalysisText += "Il sistema sta attraversando un <b>punto di inversione dell'inerzia termica</b> (picco massimo o valle minima), la temperatura ha smesso di variare bruscamente. ";
+            }
+            
+            let mediaDelta = phaseData.reduce((a, b) => a + Math.abs(b.y), 0) / phaseData.length;
+            if (mediaDelta > 0.12) {
+                phaseAnalysisText += "<br>La traiettoria globale appare caotica (zig-zag), segno di <b>elevata turbolenza atmosferica</b> (vento o nuvolosità variabile) nelle ultime 24 ore.";
+            } else {
+                phaseAnalysisText += "<br>La traiettoria globale è regolare, segno di un <b>ciclo termico isolato e stabile</b> senza grosse perturbazioni.";
+            }
+            document.getElementById('phase-analysis').innerHTML = phaseAnalysisText;
+
+            // --- Generazione testo dinamico Matrice di Correlazione ---
+            let corrTU = calcolaCorrelazionePearson(arrT, arrU);
+            let corrPG = calcolaCorrelazionePearson(arrP, arrG);
+            let corrUG = calcolaCorrelazionePearson(arrU, arrG);
+
+            let corrAnalysisText = "";
+            if (corrTU <= -0.8) {
+                corrAnalysisText += "🔥 <b>Termodinamica:</b> Forte correlazione inversa ("+corrTU.toFixed(2)+") tra Temperatura e Umidità. Giornata secca dominata dal forte irraggiamento solare.<br>";
+            } else if (corrTU >= 0.5) {
+                corrAnalysisText += "🌧️ <b>Saturazione:</b> Rara correlazione positiva ("+corrTU.toFixed(2)+") tra Temperatura e Umidità. Possibile arrivo imminente di un fronte caldo-umido.<br>";
+            }
+
+            if (corrPG <= -0.6) {
+                corrAnalysisText += "🌬️ <b>Qualità Aria:</b> Forte correlazione inversa ("+corrPG.toFixed(2)+") tra Pressione e Inquinanti (Gas). L'alta pressione porta aria pulita, mentre i cali di pressione richiamano aria viziata.<br>";
+            } else if (corrPG >= 0.6) {
+                corrAnalysisText += "🏭 <b>Qualità Aria:</b> Forte correlazione positiva ("+corrPG.toFixed(2)+") tra Pressione e Inquinanti. L'alta pressione atmosferica sta schiacciando lo smog al suolo (fenomeno di inversione termica tipico invernale).<br>";
+            }
+
+            if (Math.abs(corrUG) <= 0.2) {
+                corrAnalysisText += "✅ <b>Sensori:</b> L'indice di influenza Umidità/Gas è molto basso ("+corrUG.toFixed(2)+"). Il sensore MQ lavora in regime ideale senza falsi positivi dovuti all'umidità.";
+            }
+            
+            document.getElementById('corr-analysis').innerHTML = corrAnalysisText;
         }
 
         // ============================================================================
